@@ -1,5 +1,13 @@
 const { getStore } = require('@netlify/blobs');
 
+function store() {
+  return getStore({
+    name: 'ts-app',
+    siteID: process.env.NETLIFY_SITE_ID,
+    token: process.env.NETLIFY_AUTH_TOKEN
+  });
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
@@ -13,18 +21,18 @@ exports.handler = async (event) => {
       return { statusCode: 400, body: JSON.stringify({ error: 'Немає підписки' }) };
     }
 
-    const store = getStore('ts-app');
-    const existing = (await store.get('subscriptions', { type: 'json' })) || [];
+    const s = store();
+    const existing = (await s.get('subscriptions', { type: 'json' })) || [];
 
     let updated;
     if (action === 'unsubscribe') {
-      updated = existing.filter(s => s.endpoint !== subscription.endpoint);
+      updated = existing.filter(sub => sub.endpoint !== subscription.endpoint);
     } else {
-      updated = existing.filter(s => s.endpoint !== subscription.endpoint);
+      updated = existing.filter(sub => sub.endpoint !== subscription.endpoint);
       updated.push(subscription);
     }
 
-    await store.setJSON('subscriptions', updated);
+    await s.setJSON('subscriptions', updated);
 
     return {
       statusCode: 200,
