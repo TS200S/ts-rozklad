@@ -1,5 +1,13 @@
 const { getStore } = require('@netlify/blobs');
 
+function store() {
+  return getStore({
+    name: 'ts-app',
+    siteID: process.env.NETLIFY_SITE_ID,
+    token: process.env.NETLIFY_AUTH_TOKEN
+  });
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
@@ -13,8 +21,8 @@ exports.handler = async (event) => {
       return { statusCode: 400, body: JSON.stringify({ error: 'Немає даних розкладу' }) };
     }
 
-    const store = getStore('ts-app');
-    await store.setJSON('schedule-data', {
+    const s = store();
+    await s.setJSON('schedule-data', {
       schedule,
       subjects,
       notif10: cfg?.notif10 !== false,
