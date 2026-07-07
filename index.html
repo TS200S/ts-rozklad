@@ -109,15 +109,58 @@ body.tab-zoom  .content>div:not(.hidden){animation:tabZoomIn .2s cubic-bezier(.3
 @keyframes tabZoomIn{from{opacity:0;transform:scale(.96)}to{opacity:1;transform:scale(1)}}
 
 /* ===== SPLASH ===== */
-#splash{position:fixed;inset:0;z-index:9999;background:radial-gradient(ellipse at 50% 40%,#0a1530 0%,#04060e 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;animation:splashOut .6s ease-in-out 2.8s forwards;}
+#splash,.splash-preview-wrap{position:fixed;inset:0;z-index:9999;background:radial-gradient(ellipse at 50% 40%,#0a1530 0%,#04060e 100%);display:flex;flex-direction:column;align-items:center;justify-content:center;animation:splashOut .6s ease-in-out 2.8s forwards;}
 @keyframes splashOut{0%{opacity:1;transform:scale(1)}100%{opacity:0;transform:scale(1.05);pointer-events:none;visibility:hidden}}
-.splash-logo{width:150px;height:150px;object-fit:contain;animation:splashLogoIn .8s cubic-bezier(.34,1.56,.64,1) .2s both;filter:drop-shadow(0 0 40px #2563eb) drop-shadow(0 0 80px rgba(37,99,235,.5));}
+.splash-logo{width:150px;height:150px;object-fit:contain;animation:splashLogoIn 1s cubic-bezier(.16,1,.3,1) .2s both;filter:drop-shadow(0 0 40px var(--accent)) drop-shadow(0 0 80px var(--glow));position:relative;z-index:2;}
 @keyframes splashLogoIn{0%{opacity:0;transform:scale(.4) rotate(-15deg)}100%{opacity:1;transform:scale(1) rotate(0)}}
-.splash-title{font-family:'Orbitron',sans-serif;font-size:30px;font-weight:900;letter-spacing:6px;color:#fff;margin-top:22px;animation:splashTextIn .7s ease .9s both;text-shadow:0 0 30px #2563eb;}
+.splash-glow{position:absolute;width:300px;height:300px;border-radius:50%;background:radial-gradient(circle,var(--glow) 0%,transparent 72%);animation:splashGlowPulse 3.4s cubic-bezier(.16,1,.3,1) .05s both;pointer-events:none;}
+@keyframes splashGlowPulse{0%{opacity:0;transform:scale(.25)}45%{opacity:1}100%{opacity:.45;transform:scale(1.7)}}
+.splash-particles{position:absolute;inset:0;pointer-events:none;overflow:hidden;}
+.splash-particles span{position:absolute;bottom:38%;width:4px;height:4px;border-radius:50%;background:var(--accent);box-shadow:0 0 10px var(--accent),0 0 20px var(--glow);opacity:0;animation:splashParticleUp 3.4s ease-in infinite;}
+.splash-particles span:nth-child(1){left:24%;animation-delay:.35s}
+.splash-particles span:nth-child(2){left:39%;animation-delay:1.05s}
+.splash-particles span:nth-child(3){left:50%;animation-delay:.1s}
+.splash-particles span:nth-child(4){left:63%;animation-delay:1.35s}
+.splash-particles span:nth-child(5){left:77%;animation-delay:.7s}
+.splash-particles span:nth-child(6){left:58%;animation-delay:1.85s}
+@keyframes splashParticleUp{0%{opacity:0;transform:translateY(0) scale(.5)}12%{opacity:.9}75%{opacity:.35}100%{opacity:0;transform:translateY(-230px) scale(1.1)}}
+.splash-title{font-family:'Orbitron',sans-serif;font-size:30px;font-weight:900;letter-spacing:6px;color:#fff;margin-top:22px;animation:splashTextIn .8s cubic-bezier(.16,1,.3,1) .9s both;text-shadow:0 0 30px var(--accent);}
 @keyframes splashTextIn{0%{opacity:0;transform:translateY(20px)}100%{opacity:1;transform:translateY(0)}}
 .splash-sub{font-size:11px;letter-spacing:4px;color:#3a4560;font-weight:700;text-transform:uppercase;margin-top:7px;animation:splashTextIn .7s ease 1.2s both;}
 .splash-bar-wrap{width:130px;height:2px;background:#1e2540;border-radius:1px;margin-top:36px;overflow:hidden;animation:splashTextIn .5s ease 1.5s both;}
-.splash-bar{height:100%;width:0;background:linear-gradient(90deg,#2563eb,#60a5fa);animation:splashBarFill 1.5s ease 1.6s forwards;}
+.splash-bar{height:100%;width:0;background:linear-gradient(90deg,var(--accent),var(--accent2));animation:splashBarFill 1.6s cubic-bezier(.16,1,.3,1) 1.6s forwards;}
+
+/* ---- Launch animation variants ---- */
+[data-splash="spin"] .splash-logo{animation:splashSpinIn 1s cubic-bezier(.22,1,.36,1) .2s both!important;}
+@keyframes splashSpinIn{0%{opacity:0;transform:scale(.2) rotate(-340deg)}100%{opacity:1;transform:scale(1) rotate(0)}}
+[data-splash="slide"] .splash-logo{animation:splashSlideIn .8s cubic-bezier(.22,1,.36,1) .2s both!important;}
+@keyframes splashSlideIn{0%{opacity:0;transform:translateY(70px) scale(.85)}100%{opacity:1;transform:translateY(0) scale(1)}}
+[data-splash="slide"] .splash-title{animation:splashSlideText .6s cubic-bezier(.22,1,.36,1) .85s both!important;}
+@keyframes splashSlideText{0%{opacity:0;transform:translateY(24px)}100%{opacity:1;transform:translateY(0)}}
+[data-splash="pulse"] .splash-logo{animation:splashPulseIn .8s cubic-bezier(.34,1.56,.64,1) .2s both,splashPulseGlow 1.4s ease-in-out 1.1s infinite!important;}
+@keyframes splashPulseIn{0%{opacity:0;transform:scale(0)}70%{transform:scale(1.1)}100%{opacity:1;transform:scale(1)}}
+@keyframes splashPulseGlow{0%,100%{filter:drop-shadow(0 0 40px var(--accent)) drop-shadow(0 0 80px var(--glow))}50%{filter:drop-shadow(0 0 65px var(--accent)) drop-shadow(0 0 120px var(--glow))}}
+
+[data-splash="blur"] .splash-logo{animation:splashBlurIn 1.2s cubic-bezier(.22,1,.36,1) .1s both!important;}
+@keyframes splashBlurIn{0%{opacity:0;filter:blur(24px);transform:scale(1.35)}100%{opacity:1;filter:blur(0) drop-shadow(0 0 40px var(--accent)) drop-shadow(0 0 80px var(--glow));transform:scale(1)}}
+[data-splash="blur"] .splash-title{animation:splashBlurText 1s cubic-bezier(.22,1,.36,1) .55s both!important;}
+@keyframes splashBlurText{0%{opacity:0;filter:blur(10px);letter-spacing:24px}100%{opacity:1;filter:blur(0);letter-spacing:6px}}
+[data-splash="blur"] .splash-sub{animation:splashTextIn .7s ease 1.1s both!important;}
+
+[data-splash="neon"] .splash-logo{animation:splashNeonFade .25s ease .2s both,splashNeonFlicker 1.6s ease .45s both!important;}
+@keyframes splashNeonFade{0%{opacity:0}100%{opacity:1}}
+@keyframes splashNeonFlicker{0%,18%,22%,25%,53%,57%,100%{filter:drop-shadow(0 0 40px var(--accent)) drop-shadow(0 0 90px var(--glow))}20%,24%,55%{filter:drop-shadow(0 0 4px var(--accent))}}
+[data-splash="neon"] .splash-title{animation:splashNeonFade .25s ease .5s both,splashNeonTextFlicker 1.6s ease .75s both!important;color:#fff!important;}
+@keyframes splashNeonTextFlicker{0%,18%,22%,25%,53%,57%,100%{text-shadow:0 0 10px var(--accent),0 0 30px var(--accent),0 0 60px var(--accent)}20%,24%,55%{text-shadow:0 0 2px var(--accent)}}
+[data-splash="neon"] .splash-sub{animation:splashTextIn .7s ease 1.2s both!important;}
+
+[data-splash="glitch"] .splash-logo{animation:splashSpinIn 1s cubic-bezier(.22,1,.36,1) .2s both!important;}
+[data-splash="glitch"] .splash-title{animation:splashTextIn .5s ease .85s both,splashGlitch 2.4s ease infinite 1.4s!important;}
+@keyframes splashGlitch{0%,88%,100%{text-shadow:0 0 30px var(--accent);transform:translate(0)}90%{text-shadow:-3px 0 #ff2d55,3px 0 #00e5ff;transform:translate(-2px,0)}92.5%{text-shadow:3px 0 #ff2d55,-3px 0 #00e5ff;transform:translate(2px,0)}95%{text-shadow:0 0 30px var(--accent);transform:translate(0)}}
+
+/* ---- Tactile press feedback for a smoother, more responsive feel ---- */
+button,.card,.aitem-wrap,.theme-btn,.vtbtn,.tab-btn,.btn-g,.edaybtn,.cs-btn,.cal-nav,.addbtn,.savebtn,.ibtn{-webkit-tap-highlight-color:transparent;}
+button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.tab-btn:active,.btn-g:active,.edaybtn:active,.cs-btn:active,.cal-nav:active,.addbtn:active,.savebtn:active{transform:scale(.95);transition:transform .1s cubic-bezier(.22,1,.36,1)!important;}
 @keyframes splashBarFill{0%{width:0}100%{width:100%}}
 
 /* ===== UPDATE / OFFLINE BANNERS ===== */
@@ -373,6 +416,8 @@ body.tab-zoom  .content>div:not(.hidden){animation:tabZoomIn .2s cubic-bezier(.3
 
 <!-- SPLASH -->
 <div id="splash">
+  <div class="splash-glow"></div>
+  <div class="splash-particles"><span></span><span></span><span></span><span></span><span></span><span></span></div>
   <img src="icon-512.png" class="splash-logo" alt="TS">
   <div class="splash-title">РОЗКЛАД</div>
   <div class="splash-sub">TS · Навчальний планер</div>
@@ -533,6 +578,34 @@ let calYear=new Date().getFullYear(), calMonth=new Date().getMonth();
 let calSelected=null; // {year,month,day}
 
 // ===== THEME =====
+function hexToRgb(hex){
+  hex=(hex||'#2563eb').replace('#','');
+  if(hex.length===3)hex=hex.split('').map(c=>c+c).join('');
+  const num=parseInt(hex,16);
+  return {r:(num>>16)&255,g:(num>>8)&255,b:num&255};
+}
+function lightenHex(hex,amt){
+  const {r,g,b}=hexToRgb(hex);
+  const l=v=>Math.min(255,Math.round(v+(255-v)*amt));
+  return '#'+[l(r),l(g),l(b)].map(x=>x.toString(16).padStart(2,'0')).join('');
+}
+function applyCustomColor(hex){
+  const {r,g,b}=hexToRgb(hex);
+  document.body.style.setProperty('--accent',hex);
+  document.body.style.setProperty('--accent2',lightenHex(hex,.35));
+  document.body.style.setProperty('--glow',`rgba(${r},${g},${b},0.3)`);
+  document.body.style.setProperty('--accent-bg',`rgba(${r},${g},${b},0.12)`);
+}
+function clearCustomColor(){
+  ['--accent','--accent2','--glow','--accent-bg'].forEach(p=>document.body.style.removeProperty(p));
+}
+function setCustomColor(hex){
+  cfg.theme='custom';
+  cfg.customColor=hex;
+  saveCfg();
+  applyTheme();
+  renderCfg();
+}
 function applyTheme(){
   document.body.setAttribute('data-theme',cfg.theme||'blue');
   const fontMap={exo:'exo2',syne:'syne',inter:'inter',mono:'mono',system:'system',orb:'orb'};
@@ -543,6 +616,9 @@ function applyTheme(){
   ['tab-fade','tab-slide','tab-zoom'].forEach(c=>document.body.classList.remove(c));
   if(cfg.tabAnim&&cfg.tabAnim!=='none') document.body.classList.add('tab-'+cfg.tabAnim);
   document.body.setAttribute('data-bg',cfg.bgPreset||'aurora');
+  document.body.setAttribute('data-splash',cfg.splashAnim||'classic');
+  clearCustomColor();
+  if(cfg.theme==='custom'&&cfg.customColor) applyCustomColor(cfg.customColor);
 }
 applyTheme();
 
@@ -982,6 +1058,13 @@ function renderCfg(){
   <div class="sec-title">Тема</div>
   <div class="sec-card"><div class="sec-row"><div class="sec-ico">🎨</div><div class="sec-info"><div class="sec-label">Колір акценту</div>
     <div class="theme-grid">${themes.map(t=>`<button class="theme-btn ${cfg.theme===t.id?'active':''}" onclick="setTheme('${t.id}')"><div class="theme-dot" style="background:${t.c}"></div>${t.l}</button>`).join('')}</div>
+    <div style="display:flex;align-items:center;gap:10px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)">
+      <input type="color" id="custom-color-input" value="${cfg.customColor||'#2563eb'}" oninput="setCustomColor(this.value)" style="width:44px;height:44px;border-radius:12px;border:2px solid ${cfg.theme==='custom'?'var(--accent)':'var(--border)'};cursor:pointer;background:none;padding:0">
+      <div>
+        <div style="font-size:13px;font-weight:800;color:var(--text)">Свій колір</div>
+        <div style="font-size:11px;color:var(--text3)">Впливає і на анімацію заставки при вході</div>
+      </div>
+    </div>
   </div></div></div>
   <div class="sec-title">Шрифт</div>
   <div class="sec-card"><div class="sec-row"><div class="sec-ico">🔤</div><div class="sec-info"><div class="sec-label">Гарнітура</div>
@@ -1026,6 +1109,13 @@ function renderCfg(){
       ${['none','fade','slide','zoom'].map(a=>`<button class="vtbtn ${(cfg.tabAnim||'slide')===a?'active':''}" onclick="setTabAnim('${a}')" style="flex:none;padding:6px 14px">${{none:'Без',fade:'Fade',slide:'Slide',zoom:'Zoom'}[a]}</button>`).join('')}
     </div>
   </div></div></div>
+  <div class="sec-title">Анімація запуску</div>
+  <div class="sec-card"><div class="sec-row"><div class="sec-ico">🚀</div><div class="sec-info"><div class="sec-label">Заставка при вході</div>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:8px">
+      ${['classic','spin','slide','pulse','blur','neon','glitch'].map(a=>`<button class="vtbtn ${(cfg.splashAnim||'classic')===a?'active':''}" onclick="setSplashAnim('${a}')" style="flex:none;padding:6px 14px">${{classic:'Класика',spin:'Оберт',slide:'Виїзд',pulse:'Пульс',blur:'Розмиття',neon:'Неон',glitch:'Гліч'}[a]}</button>`).join('')}
+    </div>
+    <button class="vtbtn" style="margin-top:9px;width:100%" onclick="previewSplash()">👀 Переглянути</button>
+  </div></div></div>
   <div class="sec-title">Посилання</div>
   <div class="sec-card"><div class="sec-row"><div class="sec-ico">☁️</div><div class="sec-info"><div class="sec-label">Mega — хмарне сховище</div>
     <input class="sec-input" id="s-mega" type="url" value="${esc(cfg.megaLink||'')}" placeholder="https://mega.nz/folder/...">
@@ -1058,6 +1148,18 @@ function setTime24(v){cfg.time24=v;saveCfg();updateClock();renderCfg();}
 function setClockStyle(s){cfg.clockStyle=s;saveCfg();updateClock();renderCfg();}
 function setTabAnim(v){cfg.tabAnim=v;saveCfg();applyTheme();renderCfg();}
 function setBgPreset(v){cfg.bgPreset=v;saveCfg();applyTheme();renderCfg();}
+function setSplashAnim(v){cfg.splashAnim=v;saveCfg();applyTheme();renderCfg();}
+function previewSplash(){
+  const old=document.getElementById('splash-preview');
+  if(old)old.remove();
+  const div=document.createElement('div');
+  div.id='splash-preview';
+  div.className='splash-preview-wrap';
+  div.innerHTML=`<div class="splash-glow"></div><div class="splash-particles"><span></span><span></span><span></span><span></span><span></span><span></span></div><img src="icon-512.png" class="splash-logo" alt="TS"><div class="splash-title">РОЗКЛАД</div><div class="splash-sub">TS · Навчальний планер</div><div class="splash-bar-wrap"><div class="splash-bar"></div></div>`;
+  document.body.appendChild(div);
+  requestAnimationFrame(()=>document.body.setAttribute('data-splash',cfg.splashAnim||'classic'));
+  setTimeout(()=>div.remove(),3200);
+}
 function applyCfg(){cfg.name=document.getElementById('s-name').value.trim()||'Студенте';cfg.megaLink=document.getElementById('s-mega').value.trim()||'';saveCfg();alert('✅ Збережено!');}
 function resetAll(){if(!confirm('Скинути розклад?'))return;schedule=JSON.parse(JSON.stringify(DEF_SCH));subjects=JSON.parse(JSON.stringify(DEF_SUBJECTS));saveS();saveSubjs();alert('Скинуто!');render();}
 function exportData(){const blob=new Blob([JSON.stringify({schedule,subjects,cfg},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='ts-rozklad-'+new Date().toLocaleDateString('uk-UA').replace(/\./g,'-')+'.json';a.click();URL.revokeObjectURL(url);}
