@@ -518,6 +518,8 @@ function load(k,def){try{const s=localStorage.getItem(k);return s?JSON.parse(s):
 let schedule=load('ts_sch',DEF_SCH);
 let subjects=load('ts_subjs',DEF_SUBJECTS);
 let cfg={...DEF_CFG,...load('ts_cfg',{})};
+let applyingRemote=false;
+let lastSyncedTs=Number(localStorage.getItem('ts_sync_ts')||0);
 [5,6].forEach(d=>{if(!schedule[d])schedule[d]=[];});
 const saveS=()=>{localStorage.setItem('ts_sch',JSON.stringify(schedule));queueServerSync();};
 const saveSubjs=()=>{localStorage.setItem('ts_subjs',JSON.stringify(subjects));queueServerSync();};
@@ -1064,7 +1066,7 @@ function importData(e){const file=e.target.files[0];if(!file)return;const r=new 
 // ===== PASSWORD =====
 const PASS_HASH='aee6ba68244c160f86a91e0a7cfb981b';
 function md5(s){function safeAdd(x,y){var lsw=(x&0xFFFF)+(y&0xFFFF);return((x>>16)+(y>>16)+(lsw>>16)<<16)|(lsw&0xFFFF);}function bRL(n,c){return(n<<c)|(n>>>(32-c));}function cmn(q,a,b,x,s,t){return safeAdd(bRL(safeAdd(safeAdd(a,q),safeAdd(x,t)),s),b);}function ff(a,b,c,d,x,s,t){return cmn((b&c)|((~b)&d),a,b,x,s,t);}function gg(a,b,c,d,x,s,t){return cmn((b&d)|(c&(~d)),a,b,x,s,t);}function hh(a,b,c,d,x,s,t){return cmn(b^c^d,a,b,x,s,t);}function ii(a,b,c,d,x,s,t){return cmn(c^(b|(~d)),a,b,x,s,t);}var bs=[];for(var i=0;i<s.length*8;i+=8){bs[i>>5]|=(s.charCodeAt(i/8)&0xFF)<<(i%32);}var ln=s.length*8;bs[ln>>5]|=0x80<<(ln%32);bs[(((ln+64)>>>9)<<4)+14]=ln;var a=1732584193,b=-271733879,c=-1732584194,d=271733878;for(var i=0;i<bs.length;i+=16){var oa=a,ob=b,oc=c,od=d;a=ff(a,b,c,d,bs[i],7,-680876936);d=ff(d,a,b,c,bs[i+1],12,-389564586);c=ff(c,d,a,b,bs[i+2],17,606105819);b=ff(b,c,d,a,bs[i+3],22,-1044525330);a=ff(a,b,c,d,bs[i+4],7,-176418897);d=ff(d,a,b,c,bs[i+5],12,1200080426);c=ff(c,d,a,b,bs[i+6],17,-1473231341);b=ff(b,c,d,a,bs[i+7],22,-45705983);a=ff(a,b,c,d,bs[i+8],7,1770035416);d=ff(d,a,b,c,bs[i+9],12,-1958414417);c=ff(c,d,a,b,bs[i+10],17,-42063);b=ff(b,c,d,a,bs[i+11],22,-1990404162);a=ff(a,b,c,d,bs[i+12],7,1804603682);d=ff(d,a,b,c,bs[i+13],12,-40341101);c=ff(c,d,a,b,bs[i+14],17,-1502002290);b=ff(b,c,d,a,bs[i+15],22,1236535329);a=gg(a,b,c,d,bs[i+1],5,-165796510);d=gg(d,a,b,c,bs[i+6],9,-1069501632);c=gg(c,d,a,b,bs[i+11],14,643717713);b=gg(b,c,d,a,bs[i],20,-373897302);a=gg(a,b,c,d,bs[i+5],5,-701558691);d=gg(d,a,b,c,bs[i+10],9,38016083);c=gg(c,d,a,b,bs[i+15],14,-660478335);b=gg(b,c,d,a,bs[i+4],20,-405537848);a=gg(a,b,c,d,bs[i+9],5,568446438);d=gg(d,a,b,c,bs[i+14],9,-1019803690);c=gg(c,d,a,b,bs[i+3],14,-187363961);b=gg(b,c,d,a,bs[i+8],20,1163531501);a=gg(a,b,c,d,bs[i+13],5,-1444681467);d=gg(d,a,b,c,bs[i+2],9,-51403784);c=gg(c,d,a,b,bs[i+7],14,1735328473);b=gg(b,c,d,a,bs[i+12],20,-1926607734);a=hh(a,b,c,d,bs[i+5],4,-378558);d=hh(d,a,b,c,bs[i+8],11,-2022574463);c=hh(c,d,a,b,bs[i+11],16,1839030562);b=hh(b,c,d,a,bs[i+14],23,-35309556);a=hh(a,b,c,d,bs[i+1],4,-1530992060);d=hh(d,a,b,c,bs[i+4],11,1272893353);c=hh(c,d,a,b,bs[i+7],16,-155497632);b=hh(b,c,d,a,bs[i+10],23,-1094730640);a=hh(a,b,c,d,bs[i+13],4,681279174);d=hh(d,a,b,c,bs[i],11,-358537222);c=hh(c,d,a,b,bs[i+3],16,-722521979);b=hh(b,c,d,a,bs[i+6],23,76029189);a=hh(a,b,c,d,bs[i+9],4,-640364487);d=hh(d,a,b,c,bs[i+12],11,-421815835);c=hh(c,d,a,b,bs[i+15],16,530742520);b=hh(b,c,d,a,bs[i+2],23,-995338651);a=ii(a,b,c,d,bs[i],6,-198630844);d=ii(d,a,b,c,bs[i+7],10,1126891415);c=ii(c,d,a,b,bs[i+14],15,-1416354905);b=ii(b,c,d,a,bs[i+5],21,-57434055);a=ii(a,b,c,d,bs[i+12],6,1700485571);d=ii(d,a,b,c,bs[i+3],10,-1894986606);c=ii(c,d,a,b,bs[i+10],15,-1051523);b=ii(b,c,d,a,bs[i+1],21,-2054922799);a=ii(a,b,c,d,bs[i+8],6,1873313359);d=ii(d,a,b,c,bs[i+15],10,-30611744);c=ii(c,d,a,b,bs[i+6],15,-1560198380);b=ii(b,c,d,a,bs[i+13],21,1309151649);a=ii(a,b,c,d,bs[i+4],6,-145523070);d=ii(d,a,b,c,bs[i+11],10,-1120210379);c=ii(c,d,a,b,bs[i+2],15,718787259);b=ii(b,c,d,a,bs[i+9],21,-343485551);a=safeAdd(a,oa);b=safeAdd(b,ob);c=safeAdd(c,oc);d=safeAdd(d,od);}var hex='',hc='0123456789abcdef';[a,b,c,d].forEach(n=>{for(var j=0;j<4;j++){hex+=hc[(n>>(j*8+4))&0xF]+hc[(n>>(j*8))&0xF];}});return hex;}
-function checkPass(){const val=document.getElementById('lock-input').value;if(!val){document.getElementById('lock-err').textContent='❌ Введи пароль';return;}const stored=localStorage.getItem('ts_pass')||PASS_HASH;if(md5(val)===stored){localStorage.setItem('ts_authed','1');document.getElementById('lock-screen').style.display='none';setTimeout(initNotifications,1500);}else{document.getElementById('lock-err').textContent='❌ Невірний пароль';document.getElementById('lock-input').value='';document.getElementById('lock-input').focus();}}
+function checkPass(){const val=document.getElementById('lock-input').value;if(!val){document.getElementById('lock-err').textContent='❌ Введи пароль';return;}const stored=localStorage.getItem('ts_pass')||PASS_HASH;if(md5(val)===stored){localStorage.setItem('ts_authed','1');document.getElementById('lock-screen').style.display='none';setTimeout(initNotifications,1500);setTimeout(pullFromServer,1500);}else{document.getElementById('lock-err').textContent='❌ Невірний пароль';document.getElementById('lock-input').value='';document.getElementById('lock-input').focus();}}
 function changePass(){const np=document.getElementById('s-pass-new').value,rp=document.getElementById('s-pass-rep').value;if(!np){alert('Введи новий пароль!');return;}if(np!==rp){alert('Паролі не співпадають!');return;}if(np.length<4){alert('Мінімум 4 символи!');return;}localStorage.setItem('ts_pass',md5(np));alert('✅ Пароль змінено!');}
 if(localStorage.getItem('ts_authed')==='1')document.getElementById('lock-screen').style.display='none';
 
@@ -1134,13 +1136,40 @@ async function subscribeToPush(){
 
 let syncTimer=null;
 function queueServerSync(immediate=false){
-  if(Notification.permission!=='granted')return;
+  if(applyingRemote)return;
   if(syncTimer)clearTimeout(syncTimer);
   const run=()=>fetch('/.netlify/functions/save-schedule',{
     method:'POST',headers:{'Content-Type':'application/json'},
     body:JSON.stringify({schedule,subjects,cfg})
-  }).catch(err=>console.error('Server sync failed',err));
+  }).then(()=>{lastSyncedTs=Date.now();localStorage.setItem('ts_sync_ts',String(lastSyncedTs));})
+    .catch(err=>console.error('Server sync failed',err));
   if(immediate)run();else syncTimer=setTimeout(run,1500);
+}
+
+async function pullFromServer(){
+  try{
+    const res=await fetch('/.netlify/functions/load-schedule');
+    if(!res.ok)return;
+    const data=await res.json();
+    if(!data||!data.updatedAt)return;
+    if(data.updatedAt<=lastSyncedTs)return;
+    applyingRemote=true;
+    schedule=data.schedule||schedule;
+    subjects=data.subjects||subjects;
+    cfg={...cfg,notif10:data.notif10!==false,notif5:data.notif5!==false};
+    localStorage.setItem('ts_sch',JSON.stringify(schedule));
+    localStorage.setItem('ts_subjs',JSON.stringify(subjects));
+    localStorage.setItem('ts_cfg',JSON.stringify(cfg));
+    lastSyncedTs=data.updatedAt;
+    localStorage.setItem('ts_sync_ts',String(lastSyncedTs));
+    applyingRemote=false;
+    render();
+    updateBellBadge();
+    sendScheduleToSW();
+  }catch(err){
+    console.error('Pull sync failed',err);
+    applyingRemote=false;
+  }
 }
 
 function renderPushStatus(){
@@ -1253,7 +1282,14 @@ updateBellBadge();
 
 // ===== INIT =====
 renderToday();
-window.addEventListener('load',()=>setTimeout(()=>{if(localStorage.getItem('ts_authed')==='1')initNotifications(true);},3500));
+window.addEventListener('load',()=>setTimeout(()=>{
+  if(localStorage.getItem('ts_authed')==='1'){
+    initNotifications(true);
+    pullFromServer();
+  }
+},3500));
+setInterval(()=>{if(localStorage.getItem('ts_authed')==='1'&&document.visibilityState==='visible')pullFromServer();},20000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&localStorage.getItem('ts_authed')==='1')pullFromServer();});
 </script>
 </body>
 </html>
