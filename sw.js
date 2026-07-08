@@ -127,7 +127,25 @@ self.addEventListener('push', e => {
       clients.forEach(c => c.postMessage({ type: 'NOTIF_FIRED', title: data.title, body: data.body }))
     )
   );
+
+  e.waitUntil(logNotifToCache(data.title, data.body));
 });
+
+// Durable log so the Notification Center still shows push history even if
+// the app was fully closed (no page) when the push arrived — localStorage
+// isn't reachable from a service worker, but Cache Storage is.
+async function logNotifToCache(title, body) {
+  try {
+    const cache = await caches.open('ts-notif-log');
+    const req = new Request('/__notif-log__');
+    let list = [];
+    const existing = await cache.match(req);
+    if (existing) list = await existing.json();
+    list.unshift({ id: Date.now(), title, body, time: new Date().toLocaleTimeString('uk-UA', { hour: '2-digit', minute: '2-digit' }) });
+    list = list.slice(0, 50);
+    await cache.put(req, new Response(JSON.stringify(list), { headers: { 'Content-Type': 'application/json' } }));
+  } catch (err) { /* ignore, non-critical */ }
+}
 
 self.addEventListener('notificationclick', e => {
   e.notification.close();
