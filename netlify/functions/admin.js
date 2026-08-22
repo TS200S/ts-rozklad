@@ -19,6 +19,16 @@ async function requireAdmin(event, s) {
   return null;
 }
 
+function canManageTarget(admin, targetUser) {
+  const targetMaster = String(targetUser?.username || '').trim().toLowerCase() === admin.master;
+  const targetAdmin = targetUser?.role === 'admin' || targetMaster;
+  return admin.user.username === admin.master || !targetAdmin;
+}
+
+function isMasterUsername(username, master) {
+  return String(username || '').trim().toLowerCase() === master;
+}
+
 function sessionId(token) {
   return crypto.createHash('sha256').update(token).digest('hex').slice(0, 16);
 }
@@ -62,7 +72,7 @@ exports.handler = async (event) => {
         const subs = (await s.get(`subscriptions:${u.userId}`, { type: 'json' }).catch(() => null)) || [];
         users.push({
           username: u.username, email: u.email || null, emailVerified: u.emailVerified === true,
-          role: u.role || 'user', createdAt: u.createdAt || null, lastActive: u.lastActive || null,
+          role: isMasterUsername(u.username, admin.master) ? 'master' : (u.role || 'user'), isMaster: isMasterUsername(u.username, admin.master), createdAt: u.createdAt || null, lastActive: u.lastActive || null,
           banned: !!u.banned, banReason: u.banReason || null, banExpiresAt: u.banExpiresAt || 0, sessionsCount: sessions.length,
           ips: [...new Set(sessions.map(x => x.ip).filter(Boolean))],
           scheduleUpdatedAt: schedData?.updatedAt || null,
@@ -96,6 +106,7 @@ exports.handler = async (event) => {
       const user = await s.get(`user:${username}`, { type: 'json' }).catch(() => null);
       if (!user) return json(404, { error: 'Користувача не знайдено' });
       if (username === admin.user.username) return json(400, { error: 'Для власного акаунта скористайся виходом із пристрою' });
+      if (!canManageTarget(admin, user)) return json(403, { error: 'Звичайний адміністратор не може керувати головним адміністратором або іншим адміністратором' });
       const sessions = await listSessionsForUser(s, user.userId);
       const target = sessions.find(x => sessionId(x.token) === sid);
       if (!target) return json(404, { error: 'Сесію не знайдено' });
@@ -109,6 +120,7 @@ exports.handler = async (event) => {
       const user = await s.get(`user:${username}`, { type: 'json' }).catch(() => null);
       if (!user) return json(404, { error: 'Користувача не знайдено' });
       if (username === admin.user.username) return json(400, { error: 'Не можна завершити всі власні сесії з адмін-панелі' });
+      if (!canManageTarget(admin, user)) return json(403, { error: 'Звичайний адміністратор не може керувати головним адміністратором або іншим адміністратором' });
       await deleteAllSessionsForUser(s, user.userId);
       await audit(s, admin.user.username, 'revoke-all-sessions', { username });
       return json(200, { ok: true });
@@ -120,6 +132,7 @@ exports.handler = async (event) => {
       if (username === admin.user.username) return json(400, { error: 'Не можна заблокувати самого себе' });
       const user = await s.get(`user:${username}`, { type: 'json' }).catch(() => null);
       if (!user) return json(404, { error: 'Користувача не знайдено' });
+      if (!canManageTarget(admin, user)) return json(403, { error: 'Звичайний адміністратор не може заблокувати головного адміністратора або іншого адміністратора' });
 
       const isBan = action === 'ban-user';
       user.banned = isBan;
@@ -134,10 +147,24 @@ exports.handler = async (event) => {
       if (isBan) {
         for (const session of sessionsBeforeBan) {
           await s.setJSON(`revoked-ban:${session.token}`, {
+            username,
+            userId: user.userId,
             reason: user.banReason || '',
             expiresAt: user.banExpiresAt || 0,
-            createdAt: Date.now()
+            createdAt: Date.now(),
+            releasedAt: 0
           }).catch(()=>{});
+        }
+      }
+      if (!isBan) {
+        const { blobs: revokedBlobs } = await s.list({ prefix: 'revoked-ban:' }).catch(() => ({blobs:[]}));
+        for (const b of revokedBlobs) {
+          const mark = await s.get(b.key, {type:'json'}).catch(()=>null);
+          if (mark && mark.username === username) {
+            // The old token must remain invalid, but it must no longer
+            // display stale ban information after an unban.
+            await s.delete(b.key).catch(()=>{});
+          }
         }
       }
       await deleteAllSessionsForUser(s, user.userId);
@@ -158,6 +185,7 @@ exports.handler = async (event) => {
       if (username === admin.user.username) return json(400, { error: 'Не можна видалити самого себе' });
       const user = await s.get(`user:${username}`, { type: 'json' }).catch(() => null);
       if (!user) return json(404, { error: 'Користувача не знайдено' });
+      if (!canManageTarget(admin, user)) return json(403, { error: 'Звичайний адміністратор не може видалити головного адміністратора або іншого адміністратора' });
 
       const sessions = await listSessionsForUser(s, user.userId);
       if (body.blockIp) {
@@ -179,6 +207,7 @@ exports.handler = async (event) => {
       const username = String(body.username || '').trim().toLowerCase();
       const user = await s.get(`user:${username}`, { type: 'json' }).catch(() => null);
       if (!user) return json(404, { error: 'Користувача не знайдено' });
+      if (!canManageTarget(admin, user)) return json(403, { error: 'Звичайний адміністратор не може змінювати дані іншого адміністратора' });
       const rawEmail = body.email == null ? '' : String(body.email).trim().toLowerCase();
       if (!rawEmail) {
         if (user.email) await s.delete(`email:${user.email}`).catch(() => {});
@@ -204,7 +233,8 @@ exports.handler = async (event) => {
       if (username === master && role !== 'admin') return json(400, { error: 'Головного адміністратора не можна позбавити прав' });
       const user = await s.get(`user:${username}`, { type: 'json' }).catch(() => null);
       if (!user) return json(404, { error: 'Користувача не знайдено' });
-      user.role = role;
+      if (!canManageTarget(admin, user)) return json(403, { error: 'Звичайний адміністратор не може змінювати роль іншого адміністратора' });
+      user.role = isMasterUsername(username, master) ? 'admin' : role;
       await s.setJSON(`user:${username}`, user);
       if (role !== 'admin') await deleteAllSessionsForUser(s, user.userId);
       await audit(s, admin.user.username, 'set-role', { username, role });
