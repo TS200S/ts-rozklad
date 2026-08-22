@@ -42,7 +42,13 @@ async function validateSession(s, token) {
   let sess;
   try { sess = await s.get(`session:${token}`, { type: 'json' }); } catch { return null; }
   if (!sess) return null;
-  if (sess.expiresAt < Date.now()) {
+
+  // Any token marked as revoked is permanently invalid. Ban metadata is
+  // handled by session-status so the client can show the correct message.
+  const revoked = await s.get(`revoked-ban:${token}`, { type: 'json' }).catch(() => null);
+  if (revoked) return null;
+
+  if (sess.expiresAt <= Date.now()) {
     await deleteSession(s, token);
     return null;
   }
@@ -52,11 +58,18 @@ async function validateSession(s, token) {
     await deleteSession(s, token);
     return null;
   }
+
+  // A ban invalidates this session immediately. Never allow a banned
+  // session to continue making protected requests.
   if (user.banned) {
-    return { ...sess, banned: true };
+    return {
+      ...sess,
+      banned: true,
+      banReason: user.banReason || '',
+      banExpiresAt: Number(user.banExpiresAt || 0)
+    };
   }
 
-  // Keep last-active data reasonably fresh without writing on every request.
   if (!sess.lastActive || Date.now() - sess.lastActive > 5 * 60 * 1000) {
     sess.lastActive = Date.now();
     await s.setJSON(`session:${token}`, sess).catch(() => {});
