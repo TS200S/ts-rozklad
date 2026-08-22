@@ -1,7 +1,8 @@
 const crypto = require('crypto');
 const { store } = require('./lib/store');
-const { createSession } = require('./lib/session');
+const { createSession, sessionMeta } = require('./lib/session');
 const { sendCodeEmail } = require('./lib/mailer');
+const { enforceIpBan, getClientIp, rateLimit } = require('./lib/security');
 
 function hashPassword(password, salt) {
   return crypto.scryptSync(password, salt, 64).toString('hex');
@@ -20,6 +21,9 @@ exports.handler = async (event) => {
     const body = JSON.parse(event.body || '{}');
     const { action } = body;
     const s = store();
+    const ipBan = await enforceIpBan(s, event);
+    if (ipBan) return { statusCode: 403, body: JSON.stringify({ error: 'Цей IP-адрес заблоковано', ipBlocked: true }) };
+    const ip = getClientIp(event);
 
     // ---- Step 1: validate input, stash a pending registration, email a code ----
     if (action === 'request') {
@@ -33,11 +37,16 @@ exports.handler = async (event) => {
       if (uname.length < 3 || !/^[a-z0-9_.]+$/.test(uname)) {
         return { statusCode: 400, body: JSON.stringify({ error: 'Логін: мінімум 3 символи, лише латиниця/цифри/_/.' }) };
       }
-      if (String(password).length < 4) {
-        return { statusCode: 400, body: JSON.stringify({ error: 'Пароль мінімум 4 символи' }) };
+      if (String(password).length < 8 || String(password).length > 128) {
+        return { statusCode: 400, body: JSON.stringify({ error: 'Пароль має містити від 8 до 128 символів' }) };
       }
       if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(mail)) {
         return { statusCode: 400, body: JSON.stringify({ error: 'Невірний формат email' }) };
+      }
+
+      const regLimit = await rateLimit(s, `register-ip:${ip}`, 3, 15 * 60 * 1000);
+      if (!regLimit.allowed) {
+        return { statusCode: 429, body: JSON.stringify({ error: `Забагато спроб реєстрації. Спробуй через ${regLimit.retryAfter} с.` }) };
       }
 
       const existingUser = await s.get(`user:${uname}`, { type: 'json' }).catch(() => null);
@@ -60,7 +69,15 @@ exports.handler = async (event) => {
       });
 
       try {
+        const recent = await s.get(`email-cooldown:${mail}`, { type: 'json' }).catch(() => null);
+        const ipRecent = await s.get(`email-cooldown-ip:${ip}`, { type: 'json' }).catch(() => null);
+        if ((recent && Date.now() - recent.sentAt < 60 * 1000) || (ipRecent && Date.now() - ipRecent.sentAt < 60 * 1000)) throw new Error('RATE_LIMIT_COOLDOWN');
+        const emailLimit = await rateLimit(s, `email-send:${mail}`, 3, 15 * 60 * 1000);
+        const ipEmailLimit = await rateLimit(s, `email-send-ip:${ip}`, 5, 60 * 60 * 1000);
+        if (!emailLimit.allowed || !ipEmailLimit.allowed) throw new Error('RATE_LIMIT');
         await sendCodeEmail(mail, code, 'register');
+        await s.setJSON(`email-cooldown:${mail}`, { sentAt: Date.now() });
+        await s.setJSON(`email-cooldown-ip:${ip}`, { sentAt: Date.now() });
       } catch (mailErr) {
         return { statusCode: 500, body: JSON.stringify({ error: 'Не вдалось надіслати листа з кодом. Спробуй пізніше.' }) };
       }
@@ -103,7 +120,7 @@ exports.handler = async (event) => {
 
       const userId = crypto.randomUUID();
       const userRecord = {
-        userId, username: pending.username, email: mail,
+        userId, username: pending.username, email: mail, emailVerified: true,
         salt: pending.salt, hash: pending.hash,
         createdAt: Date.now(), lastActive: Date.now()
       };
@@ -111,7 +128,7 @@ exports.handler = async (event) => {
       await s.setJSON(`email:${mail}`, { username: pending.username });
       await s.delete(`pending-reg:${mail}`).catch(() => {});
 
-      const { token, expiresAt } = await createSession(s, userId, pending.username);
+      const { token, expiresAt } = await createSession(s, userId, pending.username, sessionMeta(event));
 
       return {
         statusCode: 200,

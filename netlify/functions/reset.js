@@ -2,6 +2,7 @@ const crypto = require('crypto');
 const { store } = require('./lib/store');
 const { deleteAllSessionsForUser } = require('./lib/session');
 const { sendCodeEmail } = require('./lib/mailer');
+const { enforceIpBan, getClientIp, rateLimit } = require('./lib/security');
 
 function hashPassword(password, salt) {
   return crypto.scryptSync(password, salt, 64).toString('hex');
@@ -20,6 +21,9 @@ exports.handler = async (event) => {
     const body = JSON.parse(event.body || '{}');
     const { action } = body;
     const s = store();
+    const ipBan = await enforceIpBan(s, event);
+    if (ipBan) return { statusCode: 403, body: JSON.stringify({ error: 'Цей IP-адрес заблоковано', ipBlocked: true }) };
+    const ip = getClientIp(event);
 
     // Always returns the same generic response whether or not the email is
     // registered, so this endpoint can't be used to check which emails have
@@ -47,7 +51,15 @@ exports.handler = async (event) => {
       });
 
       try {
+        const recent = await s.get(`email-cooldown:${mail}`, { type: 'json' }).catch(() => null);
+        const ipRecent = await s.get(`email-cooldown-ip:${ip}`, { type: 'json' }).catch(() => null);
+        if ((recent && Date.now() - recent.sentAt < 60 * 1000) || (ipRecent && Date.now() - ipRecent.sentAt < 60 * 1000)) throw new Error('RATE_LIMIT_COOLDOWN');
+        const emailLimit = await rateLimit(s, `email-send:${mail}`, 3, 15 * 60 * 1000);
+        const ipEmailLimit = await rateLimit(s, `email-send-ip:${ip}`, 5, 60 * 60 * 1000);
+        if (!emailLimit.allowed || !ipEmailLimit.allowed) throw new Error('RATE_LIMIT');
         await sendCodeEmail(mail, code, 'reset');
+        await s.setJSON(`email-cooldown:${mail}`, { sentAt: Date.now() });
+        await s.setJSON(`email-cooldown-ip:${ip}`, { sentAt: Date.now() });
       } catch {
         // Swallow mail errors here too, for the same anti-enumeration reason.
       }
@@ -59,8 +71,8 @@ exports.handler = async (event) => {
       if (!email || !code || !newPassword) {
         return { statusCode: 400, body: JSON.stringify({ error: 'Заповни всі поля' }) };
       }
-      if (String(newPassword).length < 4) {
-        return { statusCode: 400, body: JSON.stringify({ error: 'Пароль мінімум 4 символи' }) };
+      if (String(newPassword).length < 8 || String(newPassword).length > 128) {
+        return { statusCode: 400, body: JSON.stringify({ error: 'Пароль має містити від 8 до 128 символів' }) };
       }
       const mail = String(email).trim().toLowerCase();
       const pending = await s.get(`pending-reset:${mail}`, { type: 'json' }).catch(() => null);

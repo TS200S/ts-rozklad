@@ -1,6 +1,7 @@
 const crypto = require('crypto');
 const { store } = require('./lib/store');
-const { createSession } = require('./lib/session');
+const { createSession, sessionMeta } = require('./lib/session');
+const { enforceIpBan, getClientIp, rateLimit } = require('./lib/security');
 
 function hashPassword(password, salt) {
   return crypto.scryptSync(password, salt, 64).toString('hex');
@@ -24,6 +25,16 @@ exports.handler = async (event) => {
     const uname = String(username).trim().toLowerCase();
 
     const s = store();
+    const ipBan = await enforceIpBan(s, event);
+    if (ipBan) {
+      return { statusCode: 403, body: JSON.stringify({ error: 'Цей IP-адрес заблоковано', ipBlocked: true }) };
+    }
+    const ip = getClientIp(event);
+    const loginLimit = await rateLimit(s, `login-ip:${ip}`, 20, 15 * 60 * 1000);
+    if (!loginLimit.allowed) {
+      return { statusCode: 429, body: JSON.stringify({ error: `Забагато спроб. Спробуй через ${loginLimit.retryAfter} с.` }) };
+    }
+
     const userKey = `user:${uname}`;
     const attemptsKey = `login-attempts:${uname}`;
     const genericError = () => JSON.stringify({ error: 'Невірний логін або пароль' });
@@ -46,7 +57,10 @@ exports.handler = async (event) => {
     }
 
     const hash = hashPassword(password, user.salt);
-    if (hash !== user.hash) {
+    const a = Buffer.from(hash, 'hex');
+    const b = Buffer.from(String(user.hash || ''), 'hex');
+    const validHash = a.length === b.length && crypto.timingSafeEqual(a, b);
+    if (!validHash) {
       const newCount = (attempts.count || 0) + 1;
       const newAttempts = { count: newCount, lockedUntil: 0 };
       if (newCount >= MAX_ATTEMPTS) {
@@ -62,12 +76,12 @@ exports.handler = async (event) => {
     user.lastActive = Date.now();
     await s.setJSON(userKey, user);
 
-    const { token, expiresAt } = await createSession(s, user.userId, user.username);
+    const { token, expiresAt } = await createSession(s, user.userId, user.username, sessionMeta(event));
 
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ok: true, userId: user.userId, username: user.username, token, expiresAt })
+      body: JSON.stringify({ ok: true, userId: user.userId, username: user.username, email: user.email || null, emailVerified: user.emailVerified === true, role: (user.role === 'admin' || String(user.username).toLowerCase() === String(process.env.ADMIN_USERNAME || '').trim().toLowerCase()) ? 'admin' : 'user', token, expiresAt })
     };
   } catch (err) {
     return { statusCode: 500, body: JSON.stringify({ error: String(err) }) };
