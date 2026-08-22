@@ -487,10 +487,15 @@ button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.t
   <div class="lock-box">
     <span class="lock-ico">🔐</span>
     <div class="lock-title">TS Розклад</div>
-    <div class="lock-sub">Введи пароль для входу</div>
-    <input class="lock-input" id="lock-input" type="password" placeholder="••••" maxlength="20" onkeydown="if(event.key==='Enter')checkPass()">
-    <button class="lock-btn" onclick="checkPass()">Увійти</button>
+    <div class="lock-sub" id="auth-mode-sub">Увійди у свій акаунт</div>
+    <input class="lock-input" id="auth-username" type="text" placeholder="Логін" maxlength="24" autocomplete="username" autocapitalize="off">
+    <input class="lock-input" id="auth-password" type="password" placeholder="Пароль" maxlength="40" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitAuth()" style="margin-top:8px">
+    <button class="lock-btn" id="auth-submit-btn" onclick="submitAuth()">Увійти</button>
     <div class="lock-err" id="lock-err"></div>
+    <div style="margin-top:14px;font-size:12px;color:var(--text3)">
+      <span id="auth-toggle-text">Немає акаунту?</span>
+      <a href="javascript:void(0)" onclick="toggleAuthMode()" style="color:var(--accent2);font-weight:700;text-decoration:none" id="auth-toggle-link">Зареєструватися</a>
+    </div>
   </div>
 </div>
 
@@ -1342,11 +1347,10 @@ function renderCfg(){
   <div class="sec-card"><div class="sec-row"><div class="sec-ico">${ico('cloud')}</div><div class="sec-info"><div class="sec-label">Mega — хмарне сховище</div>
     <input class="sec-input" id="s-mega" type="url" value="${esc(cfg.megaLink||'')}" placeholder="https://mega.nz/folder/...">
   </div></div></div>
-  <div class="sec-title">Пароль</div>
-  <div class="sec-card"><div class="sec-row"><div class="sec-ico">${ico('key')}</div><div class="sec-info"><div class="sec-label">Змінити пароль</div>
-    <input class="sec-input" id="s-pass-new" type="password" placeholder="Новий пароль">
-    <input class="sec-input" style="margin-top:6px" id="s-pass-rep" type="password" placeholder="Повторити">
-    <button class="savebtn" style="margin-top:9px" onclick="changePass()">${ico('lock',16)} Змінити пароль</button>
+  <div class="sec-title">Акаунт</div>
+  <div class="sec-card"><div class="sec-row"><div class="sec-ico">${ico('user')}</div><div class="sec-info"><div class="sec-label">Ти увійшов як ${esc(localStorage.getItem('ts_username')||'—')}</div>
+    <div class="sec-sub" style="margin-top:2px">Свій розклад бачиш тільки ти, за твоїм акаунтом</div>
+    <button class="savebtn" style="margin-top:9px;background:var(--danger)" onclick="logoutAccount()">${ico('lock',16)} Вийти з акаунту</button>
   </div></div></div>
   <div class="sec-title">Синхронізація</div>
   <div class="sec-card">
@@ -1387,12 +1391,55 @@ function resetAll(){if(!confirm('Скинути розклад?'))return;schedul
 function exportData(){const blob=new Blob([JSON.stringify({schedule,subjects,cfg},null,2)],{type:'application/json'});const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='ts-rozklad-'+new Date().toLocaleDateString('uk-UA').replace(/\./g,'-')+'.json';a.click();URL.revokeObjectURL(url);}
 function importData(e){const file=e.target.files[0];if(!file)return;const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(!d.schedule)throw 0;schedule=d.schedule;[5,6].forEach(x=>{if(!schedule[x])schedule[x]=[];});if(d.subjects)subjects=d.subjects;if(d.cfg)cfg={...DEF_CFG,...d.cfg};saveS();saveSubjs();saveCfg();applyTheme();alert('✅ Імпорт успішний!');render();}catch{alert('❌ Невірний файл.');}};r.readAsText(file);e.target.value='';}
 
-// ===== PASSWORD =====
-const PASS_HASH='aee6ba68244c160f86a91e0a7cfb981b';
-function md5(s){function safeAdd(x,y){var lsw=(x&0xFFFF)+(y&0xFFFF);return((x>>16)+(y>>16)+(lsw>>16)<<16)|(lsw&0xFFFF);}function bRL(n,c){return(n<<c)|(n>>>(32-c));}function cmn(q,a,b,x,s,t){return safeAdd(bRL(safeAdd(safeAdd(a,q),safeAdd(x,t)),s),b);}function ff(a,b,c,d,x,s,t){return cmn((b&c)|((~b)&d),a,b,x,s,t);}function gg(a,b,c,d,x,s,t){return cmn((b&d)|(c&(~d)),a,b,x,s,t);}function hh(a,b,c,d,x,s,t){return cmn(b^c^d,a,b,x,s,t);}function ii(a,b,c,d,x,s,t){return cmn(c^(b|(~d)),a,b,x,s,t);}var bs=[];for(var i=0;i<s.length*8;i+=8){bs[i>>5]|=(s.charCodeAt(i/8)&0xFF)<<(i%32);}var ln=s.length*8;bs[ln>>5]|=0x80<<(ln%32);bs[(((ln+64)>>>9)<<4)+14]=ln;var a=1732584193,b=-271733879,c=-1732584194,d=271733878;for(var i=0;i<bs.length;i+=16){var oa=a,ob=b,oc=c,od=d;a=ff(a,b,c,d,bs[i],7,-680876936);d=ff(d,a,b,c,bs[i+1],12,-389564586);c=ff(c,d,a,b,bs[i+2],17,606105819);b=ff(b,c,d,a,bs[i+3],22,-1044525330);a=ff(a,b,c,d,bs[i+4],7,-176418897);d=ff(d,a,b,c,bs[i+5],12,1200080426);c=ff(c,d,a,b,bs[i+6],17,-1473231341);b=ff(b,c,d,a,bs[i+7],22,-45705983);a=ff(a,b,c,d,bs[i+8],7,1770035416);d=ff(d,a,b,c,bs[i+9],12,-1958414417);c=ff(c,d,a,b,bs[i+10],17,-42063);b=ff(b,c,d,a,bs[i+11],22,-1990404162);a=ff(a,b,c,d,bs[i+12],7,1804603682);d=ff(d,a,b,c,bs[i+13],12,-40341101);c=ff(c,d,a,b,bs[i+14],17,-1502002290);b=ff(b,c,d,a,bs[i+15],22,1236535329);a=gg(a,b,c,d,bs[i+1],5,-165796510);d=gg(d,a,b,c,bs[i+6],9,-1069501632);c=gg(c,d,a,b,bs[i+11],14,643717713);b=gg(b,c,d,a,bs[i],20,-373897302);a=gg(a,b,c,d,bs[i+5],5,-701558691);d=gg(d,a,b,c,bs[i+10],9,38016083);c=gg(c,d,a,b,bs[i+15],14,-660478335);b=gg(b,c,d,a,bs[i+4],20,-405537848);a=gg(a,b,c,d,bs[i+9],5,568446438);d=gg(d,a,b,c,bs[i+14],9,-1019803690);c=gg(c,d,a,b,bs[i+3],14,-187363961);b=gg(b,c,d,a,bs[i+8],20,1163531501);a=gg(a,b,c,d,bs[i+13],5,-1444681467);d=gg(d,a,b,c,bs[i+2],9,-51403784);c=gg(c,d,a,b,bs[i+7],14,1735328473);b=gg(b,c,d,a,bs[i+12],20,-1926607734);a=hh(a,b,c,d,bs[i+5],4,-378558);d=hh(d,a,b,c,bs[i+8],11,-2022574463);c=hh(c,d,a,b,bs[i+11],16,1839030562);b=hh(b,c,d,a,bs[i+14],23,-35309556);a=hh(a,b,c,d,bs[i+1],4,-1530992060);d=hh(d,a,b,c,bs[i+4],11,1272893353);c=hh(c,d,a,b,bs[i+7],16,-155497632);b=hh(b,c,d,a,bs[i+10],23,-1094730640);a=hh(a,b,c,d,bs[i+13],4,681279174);d=hh(d,a,b,c,bs[i],11,-358537222);c=hh(c,d,a,b,bs[i+3],16,-722521979);b=hh(b,c,d,a,bs[i+6],23,76029189);a=hh(a,b,c,d,bs[i+9],4,-640364487);d=hh(d,a,b,c,bs[i+12],11,-421815835);c=hh(c,d,a,b,bs[i+15],16,530742520);b=hh(b,c,d,a,bs[i+2],23,-995338651);a=ii(a,b,c,d,bs[i],6,-198630844);d=ii(d,a,b,c,bs[i+7],10,1126891415);c=ii(c,d,a,b,bs[i+14],15,-1416354905);b=ii(b,c,d,a,bs[i+5],21,-57434055);a=ii(a,b,c,d,bs[i+12],6,1700485571);d=ii(d,a,b,c,bs[i+3],10,-1894986606);c=ii(c,d,a,b,bs[i+10],15,-1051523);b=ii(b,c,d,a,bs[i+1],21,-2054922799);a=ii(a,b,c,d,bs[i+8],6,1873313359);d=ii(d,a,b,c,bs[i+15],10,-30611744);c=ii(c,d,a,b,bs[i+6],15,-1560198380);b=ii(b,c,d,a,bs[i+13],21,1309151649);a=ii(a,b,c,d,bs[i+4],6,-145523070);d=ii(d,a,b,c,bs[i+11],10,-1120210379);c=ii(c,d,a,b,bs[i+2],15,718787259);b=ii(b,c,d,a,bs[i+9],21,-343485551);a=safeAdd(a,oa);b=safeAdd(b,ob);c=safeAdd(c,oc);d=safeAdd(d,od);}var hex='',hc='0123456789abcdef';[a,b,c,d].forEach(n=>{for(var j=0;j<4;j++){hex+=hc[(n>>(j*8+4))&0xF]+hc[(n>>(j*8))&0xF];}});return hex;}
-function checkPass(){const val=document.getElementById('lock-input').value;if(!val){document.getElementById('lock-err').textContent='❌ Введи пароль';return;}const stored=localStorage.getItem('ts_pass')||PASS_HASH;if(md5(val)===stored){localStorage.setItem('ts_authed','1');document.getElementById('lock-screen').style.display='none';setTimeout(initNotifications,1500);setTimeout(pullFromServer,1500);setTimeout(syncNotifLogFromSW,1500);}else{document.getElementById('lock-err').textContent='❌ Невірний пароль';document.getElementById('lock-input').value='';document.getElementById('lock-input').focus();}}
-function changePass(){const np=document.getElementById('s-pass-new').value,rp=document.getElementById('s-pass-rep').value;if(!np){alert('Введи новий пароль!');return;}if(np!==rp){alert('Паролі не співпадають!');return;}if(np.length<4){alert('Мінімум 4 символи!');return;}localStorage.setItem('ts_pass',md5(np));alert('✅ Пароль змінено!');}
-if(localStorage.getItem('ts_authed')==='1')document.getElementById('lock-screen').style.display='none';
+// ===== ACCOUNT AUTH =====
+let authMode='login';
+function toggleAuthMode(){
+  authMode=authMode==='login'?'register':'login';
+  document.getElementById('auth-submit-btn').textContent=authMode==='login'?'Увійти':'Зареєструватися';
+  document.getElementById('auth-mode-sub').textContent=authMode==='login'?'Увійди у свій акаунт':'Створи новий акаунт';
+  document.getElementById('auth-toggle-text').textContent=authMode==='login'?'Немає акаунту?':'Вже є акаунт?';
+  document.getElementById('auth-toggle-link').textContent=authMode==='login'?'Зареєструватися':'Увійти';
+  document.getElementById('lock-err').textContent='';
+}
+async function submitAuth(){
+  const username=document.getElementById('auth-username').value.trim();
+  const password=document.getElementById('auth-password').value;
+  const errEl=document.getElementById('lock-err');
+  errEl.textContent='';
+  if(!username||!password){errEl.textContent='❌ Заповни логін і пароль';return;}
+  const btn=document.getElementById('auth-submit-btn');
+  btn.disabled=true;btn.textContent='Зачекай...';
+  try{
+    const res=await fetch('/.netlify/functions/auth',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:authMode,username,password})
+    });
+    const data=await res.json();
+    if(!res.ok){
+      errEl.textContent='❌ '+(data.error||'Помилка');
+      btn.disabled=false;btn.textContent=authMode==='login'?'Увійти':'Зареєструватися';
+      return;
+    }
+    localStorage.setItem('ts_userid',data.userId);
+    localStorage.setItem('ts_username',data.username);
+    localStorage.setItem('ts_authed','1');
+    document.getElementById('lock-screen').style.display='none';
+    setTimeout(initNotifications,1500);
+    setTimeout(pullFromServer,1500);
+    setTimeout(syncNotifLogFromSW,1500);
+  }catch(err){
+    errEl.textContent='❌ Проблема з мережею, спробуй ще раз';
+    btn.disabled=false;btn.textContent=authMode==='login'?'Увійти':'Зареєструватися';
+  }
+}
+function logoutAccount(){
+  if(!confirm('Вийти з акаунту на цьому пристрої?'))return;
+  localStorage.removeItem('ts_userid');
+  localStorage.removeItem('ts_username');
+  localStorage.removeItem('ts_authed');
+  location.reload();
+}
+if(localStorage.getItem('ts_authed')==='1'&&localStorage.getItem('ts_userid'))document.getElementById('lock-screen').style.display='none';
 
 // ===== SUBJECTS MODAL =====
 function buildColorPicker(sel){selColor=sel||COLORS[0];document.getElementById('color-picker').innerHTML=COLORS.map(c=>`<div onclick="pickColor('${c}')" style="width:30px;height:30px;border-radius:50%;background:${c};cursor:pointer;border:3px solid ${c===selColor?'#fff':'transparent'};transition:border-color .15s;box-sizing:border-box;flex-shrink:0"></div>`).join('');}
@@ -1448,7 +1495,7 @@ async function subscribeToPush(){
     }
     await fetch('/.netlify/functions/save-subscription',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({subscription:sub})
+      body:JSON.stringify({userId:localStorage.getItem('ts_userid'),subscription:sub})
     });
     pushStatus='subscribed';
   }catch(err){
@@ -1461,18 +1508,22 @@ async function subscribeToPush(){
 let syncTimer=null;
 function queueServerSync(immediate=false){
   if(applyingRemote)return;
+  const userId=localStorage.getItem('ts_userid');
+  if(!userId)return;
   if(syncTimer)clearTimeout(syncTimer);
   const run=()=>fetch('/.netlify/functions/save-schedule',{
     method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({schedule,subjects,cfg,notes})
+    body:JSON.stringify({userId,schedule,subjects,cfg,notes})
   }).then(()=>{lastSyncedTs=Date.now();localStorage.setItem('ts_sync_ts',String(lastSyncedTs));})
     .catch(err=>console.error('Server sync failed',err));
   if(immediate)run();else syncTimer=setTimeout(run,1500);
 }
 
 async function pullFromServer(){
+  const userId=localStorage.getItem('ts_userid');
+  if(!userId)return;
   try{
-    const res=await fetch('/.netlify/functions/load-schedule');
+    const res=await fetch('/.netlify/functions/load-schedule?userId='+encodeURIComponent(userId));
     if(!res.ok)return;
     const data=await res.json();
     if(!data||!data.updatedAt)return;
