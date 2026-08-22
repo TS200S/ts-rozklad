@@ -27,7 +27,8 @@ exports.handler = async (event) => {
     const s = store();
     const ipBan = await enforceIpBan(s, event);
     if (ipBan) {
-      return { statusCode: 403, body: JSON.stringify({ error: 'Цей IP-адрес заблоковано', ipBlocked: true }) };
+      return { statusCode: 403, body: JSON.stringify({ error:'Цей IP-адрес заблоковано', ipBlocked:true,
+        ipBanReason:ipBan.reason||'', ipBanExpiresAt:Number(ipBan.expiresAt||0), ipBanPermanent:!Number(ipBan.expiresAt||0) }) };
     }
     const ip = getClientIp(event);
     const loginLimit = await rateLimit(s, `login-ip:${ip}`, 20, 15 * 60 * 1000);
@@ -53,7 +54,16 @@ exports.handler = async (event) => {
       return { statusCode: 401, body: genericError() };
     }
     if (user.banned) {
-      return { statusCode: 403, body: JSON.stringify({ error: 'Цей акаунт заблоковано' }) };
+      const expiresAt = Number(user.banExpiresAt || 0);
+      if (expiresAt && expiresAt <= Date.now()) {
+        user.banned=false; user.banReason=null; user.banExpiresAt=0;
+        await s.setJSON(`user:${user.username}`, user);
+      } else {
+        return { statusCode:403, headers:{'Content-Type':'application/json'}, body:JSON.stringify({
+          error:'Акаунт заблоковано', banned:true, banReason:user.banReason||'',
+          banExpiresAt:expiresAt, banPermanent:!expiresAt
+        }) };
+      }
     }
 
     const hash = hashPassword(password, user.salt);

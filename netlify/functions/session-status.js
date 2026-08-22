@@ -7,10 +7,20 @@ exports.handler = async (event) => {
   try {
     const s = store();
     const ipBan = await enforceIpBan(s, event);
-    if (ipBan) return { statusCode: 403, headers: {'Content-Type':'application/json'}, body: JSON.stringify({ error:'Цей IP-адрес заблоковано', ipBlocked:true }) };
+    if (ipBan) return { statusCode: 403, headers: {'Content-Type':'application/json'}, body: JSON.stringify({error:'Цей IP-адрес заблоковано',ipBlocked:true,
+      ipBanReason:ipBan.reason||'',ipBanExpiresAt:Number(ipBan.expiresAt||0),ipBanPermanent:!Number(ipBan.expiresAt||0)}) };
     const sess = await validateSession(s, extractToken(event));
     if (!sess) return { statusCode: 401, headers:{'Content-Type':'application/json'}, body: JSON.stringify({ error:'Сесія недійсна', sessionExpired:true }) };
-    if (sess.banned) return { statusCode: 403, headers:{'Content-Type':'application/json'}, body: JSON.stringify({ error:'Акаунт заблоковано', banned:true }) };
+    if (sess.banned) {
+      const user=await s.get(`user:${sess.username}`,{type:'json'}).catch(()=>null);
+      if(user?.banned){
+        const expiresAt=Number(user.banExpiresAt||0);
+        if(expiresAt && expiresAt<=Date.now()){
+          user.banned=false;user.banReason=null;user.banExpiresAt=0;await s.setJSON(`user:${user.username}`,user);
+        } else return {statusCode:403,headers:{'Content-Type':'application/json'},body:JSON.stringify({
+          error:'Акаунт заблоковано',banned:true,banReason:user.banReason||'',banExpiresAt:expiresAt,banPermanent:!expiresAt})};
+      }
+    }
     return {
       statusCode: 200,
       headers:{'Content-Type':'application/json'},

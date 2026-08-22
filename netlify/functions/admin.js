@@ -63,7 +63,7 @@ exports.handler = async (event) => {
         users.push({
           username: u.username, email: u.email || null, emailVerified: u.emailVerified === true,
           role: u.role || 'user', createdAt: u.createdAt || null, lastActive: u.lastActive || null,
-          banned: !!u.banned, sessionsCount: sessions.length,
+          banned: !!u.banned, banReason: u.banReason || null, banExpiresAt: u.banExpiresAt || 0, sessionsCount: sessions.length,
           ips: [...new Set(sessions.map(x => x.ip).filter(Boolean))],
           scheduleUpdatedAt: schedData?.updatedAt || null,
           subjectsCount: schedData?.subjects?.length || 0, notesCount: schedData?.notes?.length || 0,
@@ -124,7 +124,10 @@ exports.handler = async (event) => {
       const isBan = action === 'ban-user';
       user.banned = isBan;
       user.bannedAt = isBan ? Date.now() : null;
-      user.banReason = isBan ? String(body.reason || '').slice(0, 200) : null;
+      user.banReason = isBan ? String(body.reason || '').slice(0, 500) : null;
+      const durationMs = {hour:3600000,day:86400000,week:604800000,forever:0}[body.duration || 'forever'] ?? 0;
+      user.banExpiresAt = isBan && durationMs ? Date.now()+durationMs : 0;
+      if (!isBan) user.banExpiresAt = 0;
       const sessionsBeforeBan = await listSessionsForUser(s, user.userId);
       const sessionIps = [...new Set(sessionsBeforeBan.map(x => x.ip).filter(x => x && x !== 'unknown'))];
       await s.setJSON(`user:${username}`, user);
