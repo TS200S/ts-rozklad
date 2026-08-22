@@ -443,7 +443,24 @@ button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.t
 @media(max-width:380px){.tab-btn{padding:9px 8px;font-size:10px;}.content{padding:14px 14px;}}
 @keyframes bellShake{0%{transform:rotate(0)}15%{transform:rotate(15deg)}30%{transform:rotate(-12deg)}45%{transform:rotate(10deg)}60%{transform:rotate(-8deg)}75%{transform:rotate(5deg)}100%{transform:rotate(0)}}
 #notif-center{display:flex;flex-direction:column;}
-</style>
+
+/* ===== EMAIL SETUP MODAL ===== */
+#email-setup-overlay{position:fixed;inset:0;z-index:10000;background:rgba(0,0,0,.72);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:20px;}
+#email-setup-box{width:min(420px,100%);background:var(--bg2);border:1px solid var(--border2);border-radius:20px;padding:24px;box-shadow:var(--shadow);}
+#email-setup-box .email-title{font-size:20px;font-weight:900;margin-bottom:7px;}
+#email-setup-box .email-sub{font-size:13px;color:var(--text2);line-height:1.5;margin-bottom:16px;}
+.email-input{width:100%;padding:12px 14px;border:1px solid var(--border2);border-radius:11px;background:var(--bg3);color:var(--text);outline:none;font:inherit;}
+.email-input:focus{border-color:var(--accent);}
+.email-code{letter-spacing:6px;text-align:center;font-family:var(--font-mono);font-weight:800;}
+.email-setup-btn{width:100%;border:0;border-radius:11px;padding:12px 14px;margin-top:10px;background:var(--accent);color:#fff;font:inherit;font-weight:800;cursor:pointer;}
+.email-setup-btn:disabled{opacity:.55;cursor:default;}
+.email-setup-secondary{width:100%;border:1px solid var(--border2);border-radius:11px;padding:10px 14px;margin-top:8px;background:transparent;color:var(--text2);font:inherit;font-weight:700;cursor:pointer;}
+.email-setup-err{min-height:18px;margin-top:9px;color:var(--danger);font-size:12px;}
+
+#account-block-overlay{position:fixed;inset:0;z-index:20000;background:rgba(0,0,0,.82);backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;padding:20px;}
+#account-block-box{max-width:430px;width:100%;padding:26px;border-radius:20px;background:var(--bg2);border:1px solid var(--border2);box-shadow:var(--shadow);text-align:center;}
+#account-block-box .bt{font-size:22px;font-weight:900;margin-bottom:8px}.account-block-msg{color:var(--text2);line-height:1.5;font-size:13px}
+.mail-notice{padding:11px 12px;margin:10px 0 12px;border:1px solid rgba(96,165,250,.25);background:rgba(37,99,235,.10);border-radius:11px;color:var(--text2);font-size:11px;line-height:1.45}.mail-notice b{color:var(--accent2)}</style>
 </head>
 <body>
 
@@ -519,7 +536,7 @@ button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.t
     <!-- REGISTER STEP 2: enter code -->
     <div id="auth-view-reg2" class="auth-view" style="display:none">
       <div class="lock-sub">Введи код з листа</div>
-      <div style="font-size:12px;color:var(--text3);margin-bottom:10px" id="reg2-email-hint"></div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:10px" id="reg2-email-hint"></div><div class="mail-notice">📧 <b>Перевір пошту</b><br>Якщо листа немає у папці «Вхідні», обов’язково перевір <b>«Спам»</b> або <b>«Небажана пошта»</b>. Лист може надійти із невеликою затримкою.</div>
       <input class="lock-input" id="reg-code" type="text" inputmode="numeric" placeholder="000000" maxlength="6" onkeydown="if(event.key==='Enter')submitRegisterVerify()">
       <button class="lock-btn" id="reg2-submit-btn" onclick="submitRegisterVerify()">Підтвердити</button>
       <div class="lock-err" id="reg2-err"></div>
@@ -542,7 +559,7 @@ button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.t
     <!-- FORGOT STEP 2: code + new password -->
     <div id="auth-view-forgot2" class="auth-view" style="display:none">
       <div class="lock-sub">Введи код та новий пароль</div>
-      <input class="lock-input" id="forgot-code" type="text" inputmode="numeric" placeholder="000000" maxlength="6">
+      <div class="mail-notice">📧 <b>Перевір пошту</b><br>Якщо листа немає у папці «Вхідні», обов’язково перевір <b>«Спам»</b> або <b>«Небажана пошта»</b>. Лист може надійти із невеликою затримкою.</div><input class="lock-input" id="forgot-code" type="text" inputmode="numeric" placeholder="000000" maxlength="6">
       <input class="lock-input" id="forgot-newpass" type="password" placeholder="Новий пароль" maxlength="40" autocomplete="new-password" style="margin-top:8px" onkeydown="if(event.key==='Enter')submitForgotConfirm()">
       <button class="lock-btn" id="forgot2-submit-btn" onclick="submitForgotConfirm()">Змінити пароль</button>
       <div class="lock-err" id="forgot2-err"></div>
@@ -554,6 +571,39 @@ button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.t
   </div>
 </div>
 
+
+<!-- OPTIONAL EMAIL SETUP FOR OLD ACCOUNTS -->
+<div id="email-setup-overlay">
+  <div id="email-setup-box">
+    <div class="email-title">📧 Добавь email</div>
+    <div class="email-sub" id="email-setup-sub">
+      У этого аккаунта пока нет email. Добавь его, чтобы потом можно было восстановить пароль.
+    </div>
+
+    <div class="mail-notice">📧 <b>Перевір пошту</b><br>Якщо листа немає у папці «Вхідні», обов’язково перевір <b>«Спам»</b> або <b>«Небажана пошта»</b>. Лист може надійти із невеликою затримкою.</div><div id="email-setup-step1">
+      <input class="email-input" id="account-email-input" type="email" placeholder="Твой email" autocomplete="email">
+      <button class="email-setup-btn" id="account-email-request-btn" onclick="requestAccountEmail()">Получить код</button>
+      <button class="email-setup-secondary" onclick="closeEmailSetup()">Позже</button>
+      <div class="email-setup-err" id="account-email-err"></div>
+    </div>
+
+    <div id="email-setup-step2" style="display:none">
+      <input class="email-input email-code" id="account-email-code" type="text" inputmode="numeric" maxlength="6" placeholder="000000" onkeydown="if(event.key==='Enter')verifyAccountEmail()">
+      <button class="email-setup-btn" id="account-email-verify-btn" onclick="verifyAccountEmail()">Подтвердить email</button>
+      <button class="email-setup-secondary" onclick="showEmailSetupStep(1)">← Изменить email</button>
+      <div class="email-setup-err" id="account-email-verify-err"></div>
+    </div>
+  </div>
+</div>
+
+
+<div id="account-block-overlay">
+  <div id="account-block-box">
+    <div class="bt" id="account-block-title">🔒 Акаунт заблоковано</div>
+    <div class="account-block-msg" id="account-block-msg">Доступ до цього акаунта обмежено адміністратором.</div>
+    <button class="lock-btn" style="margin-top:18px" onclick="forceLocalLogout()">Вийти</button>
+  </div>
+</div>
 <!-- HEADER -->
 <div class="header">
   <div class="header-top">
@@ -1405,7 +1455,7 @@ function renderCfg(){
   <div class="sec-title">Акаунт</div>
   <div class="sec-card"><div class="sec-row"><div class="sec-ico">${ico('user')}</div><div class="sec-info"><div class="sec-label">Ти увійшов як ${esc(localStorage.getItem('ts_username')||'—')}</div>
     <div class="sec-sub" style="margin-top:2px">Свій розклад бачиш тільки ти, за твоїм акаунтом</div>
-    <button class="savebtn" style="margin-top:9px" onclick="window.open('admin.html','_blank')">${ico('user',16)} Адмін-панель</button>
+    <button id="admin-panel-btn" class="savebtn" style="margin-top:9px;display:none" onclick="window.open('admin.html','_blank')">${ico('user',16)} Адмін-панель</button>
     <button class="savebtn" style="margin-top:9px;background:var(--danger)" onclick="logoutAccount()">${ico('lock',16)} Вийти з акаунту</button>
   </div></div></div>
   <div class="sec-title">Синхронізація</div>
@@ -1423,6 +1473,8 @@ function renderCfg(){
   <button class="savebtn" onclick="applyCfg()">${ico('check',16)} Зберегти налаштування</button>
   <div style="height:30px"></div>`;
   renderPushStatus();
+  const adminBtn=document.getElementById('admin-panel-btn');
+  if(adminBtn)adminBtn.style.display=localStorage.getItem('ts_is_admin')==='1'?'block':'none';
 }
 function setTheme(t){cfg.theme=t;saveCfg();applyTheme();renderCfg();}
 function setFont(f){cfg.font=f;saveCfg();applyTheme();renderCfg();}
@@ -1460,7 +1512,10 @@ function onAuthSuccess(data){
   localStorage.setItem('ts_username',data.username);
   localStorage.setItem('ts_token',data.token);
   localStorage.setItem('ts_authed','1');
+  if(data.email) localStorage.setItem('ts_email',data.email); else localStorage.removeItem('ts_email');
+  localStorage.setItem('ts_is_admin',data.role==='admin'?'1':'0');
   document.getElementById('lock-screen').style.display='none';
+  setTimeout(checkEmailSetup,100);setTimeout(checkAdminRole,150);setTimeout(checkSessionStatus,250);setInterval(checkSessionStatus,30000);
   setTimeout(initNotifications,1500);
   setTimeout(pullFromServer,1500);
   setTimeout(syncNotifLogFromSW,1500);
@@ -1594,6 +1649,156 @@ async function submitForgotConfirm(){
   }
 }
 
+
+let pendingAccountEmail='';
+
+function showEmailSetupStep(step){
+  document.getElementById('email-setup-step1').style.display=step===1?'block':'none';
+  document.getElementById('email-setup-step2').style.display=step===2?'block':'none';
+  document.getElementById('account-email-err').textContent='';
+  document.getElementById('account-email-verify-err').textContent='';
+}
+
+function closeEmailSetup(){
+  document.getElementById('email-setup-overlay').style.display='none';
+}
+
+async function checkEmailSetup(){
+  const token=localStorage.getItem('ts_token');
+  if(!token)return;
+
+  try{
+    const res=await fetch('/.netlify/functions/account-email',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body:JSON.stringify({action:'status'})
+    });
+    const data=await res.json();
+    if(!res.ok)return;
+
+    if(data.email) localStorage.setItem('ts_email',data.email);
+    else localStorage.removeItem('ts_email');
+
+    if(!data.email || data.emailVerified!==true){
+      document.getElementById('account-email-input').value=data.email||'';
+      document.getElementById('email-setup-overlay').style.display='flex';
+      showEmailSetupStep(1);
+    }else{
+      closeEmailSetup();
+    }
+  }catch{}
+}
+
+async function requestAccountEmail(){
+  const email=document.getElementById('account-email-input').value.trim();
+  const errEl=document.getElementById('account-email-err');
+  errEl.textContent='';
+  if(!email){errEl.textContent='❌ Введи email';return;}
+
+  const btn=document.getElementById('account-email-request-btn');
+  btn.disabled=true;btn.textContent='Надсилаємо...';
+
+  try{
+    const token=localStorage.getItem('ts_token');
+    const res=await fetch('/.netlify/functions/account-email',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body:JSON.stringify({action:'request',email})
+    });
+    const data=await res.json();
+    btn.disabled=false;btn.textContent='Отримати код';
+    if(!res.ok){errEl.textContent='❌ '+(data.error||'Помилка');return;}
+
+    pendingAccountEmail=data.email;
+    document.getElementById('account-email-code').value='';
+    document.getElementById('account-email-verify-err').textContent='';
+    document.getElementById('email-setup-sub').textContent='Ми надіслали 6-значний код на '+pendingAccountEmail+'. Код дійсний 15 хвилин.';
+    showEmailSetupStep(2);
+  }catch{
+    btn.disabled=false;btn.textContent='Отримати код';
+    errEl.textContent='❌ Проблема з мережею, спробуй ще раз';
+  }
+}
+
+async function verifyAccountEmail(){
+  const code=document.getElementById('account-email-code').value.trim();
+  const errEl=document.getElementById('account-email-verify-err');
+  errEl.textContent='';
+  if(!code){errEl.textContent='❌ Введи код';return;}
+
+  const btn=document.getElementById('account-email-verify-btn');
+  btn.disabled=true;btn.textContent='Перевіряємо...';
+
+  try{
+    const token=localStorage.getItem('ts_token');
+    const res=await fetch('/.netlify/functions/account-email',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body:JSON.stringify({action:'verify',code})
+    });
+    const data=await res.json();
+    btn.disabled=false;btn.textContent='Підтвердити email';
+    if(!res.ok){errEl.textContent='❌ '+(data.error||'Помилка');return;}
+
+    localStorage.setItem('ts_email',data.email);
+    closeEmailSetup();
+    alert('✅ Email підтверджено!');
+  }catch{
+    btn.disabled=false;btn.textContent='Підтвердити email';
+    errEl.textContent='❌ Проблема з мережею, спробуй ще раз';
+  }
+}
+
+
+async function checkAdminRole(){
+  const token=localStorage.getItem('ts_token');
+  if(!token)return;
+  try{
+    const res=await fetch('/.netlify/functions/admin',{
+      method:'POST',
+      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      body:JSON.stringify({action:'my-role'})
+    });
+    localStorage.setItem('ts_is_admin',res.ok?'1':'0');
+    if(typeof render==='function')render();
+  }catch{}
+}
+
+
+function forceLocalLogout(){
+  localStorage.removeItem('ts_userid');localStorage.removeItem('ts_username');localStorage.removeItem('ts_token');
+  localStorage.removeItem('ts_authed');localStorage.removeItem('ts_email');localStorage.removeItem('ts_is_admin');
+  location.reload();
+}
+
+function showAccountBlocked(message, title='🔒 Акаунт заблоковано'){
+  const o=document.getElementById('account-block-overlay');
+  if(!o)return;
+  document.getElementById('account-block-title').textContent=title;
+  document.getElementById('account-block-msg').textContent=message;
+  o.style.display='flex';
+}
+
+async function checkSessionStatus(){
+  const token=localStorage.getItem('ts_token');
+  if(!token)return;
+  try{
+    const res=await fetch('/.netlify/functions/session-status',{headers:{'Authorization':'Bearer '+token}});
+    const data=await res.json().catch(()=>({}));
+    if(res.status===403 && data.banned){
+      showAccountBlocked('Доступ до цього акаунта обмежено адміністратором.');
+      return;
+    }
+    if(res.status===403 && data.ipBlocked){
+      showAccountBlocked('Цей IP-адрес заблоковано адміністратором.','🚫 IP-адресу заблоковано');
+      return;
+    }
+    if(res.status===401){
+      forceLocalLogout();
+    }
+  }catch{}
+}
+
 function logoutAccount(){
   if(!confirm('Вийти з акаунту на цьому пристрої?'))return;
   const token=localStorage.getItem('ts_token');
@@ -1604,9 +1809,11 @@ function logoutAccount(){
   localStorage.removeItem('ts_username');
   localStorage.removeItem('ts_token');
   localStorage.removeItem('ts_authed');
+  localStorage.removeItem('ts_email');
+  localStorage.removeItem('ts_is_admin');
   location.reload();
 }
-if(localStorage.getItem('ts_authed')==='1'&&localStorage.getItem('ts_userid'))document.getElementById('lock-screen').style.display='none';
+if(localStorage.getItem('ts_authed')==='1'&&localStorage.getItem('ts_userid')){document.getElementById('lock-screen').style.display='none';setTimeout(checkEmailSetup,100);setTimeout(checkAdminRole,150);setTimeout(checkSessionStatus,250);setInterval(checkSessionStatus,30000);}
 
 // ===== SUBJECTS MODAL =====
 function buildColorPicker(sel){selColor=sel||COLORS[0];document.getElementById('color-picker').innerHTML=COLORS.map(c=>`<div onclick="pickColor('${c}')" style="width:30px;height:30px;border-radius:50%;background:${c};cursor:pointer;border:3px solid ${c===selColor?'#fff':'transparent'};transition:border-color .15s;box-sizing:border-box;flex-shrink:0"></div>`).join('');}

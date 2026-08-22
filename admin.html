@@ -6,131 +6,99 @@
 <title>Адмін-панель — TS Розклад</title>
 <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;600;700;800&family=Orbitron:wght@700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
-:root{
-  --bg:#080a10;--bg2:#0d1020;--bg3:#131828;
-  --border:#1e2540;--text:#e8eef8;--text2:#98a8c8;--text3:#5a6888;
-  --accent:#2563eb;--accent2:#60a5fa;--danger:#ef4444;--warn:#f59e0b;--success:#10b981;
-  --radius:14px;
-}
-*{box-sizing:border-box;margin:0;padding:0;}
-body{background:var(--bg);color:var(--text);font-family:'Exo 2',sans-serif;min-height:100vh;padding:20px;}
-h1{font-family:'Orbitron',sans-serif;font-size:22px;margin-bottom:4px;background:linear-gradient(135deg,#60a5fa,#2563eb);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
-.sub{color:var(--text3);font-size:13px;margin-bottom:22px;}
-.state{padding:40px 20px;text-align:center;color:var(--text2);}
-.state.err{color:var(--danger);}
-table{width:100%;border-collapse:collapse;background:var(--bg2);border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);}
-th,td{padding:10px 12px;text-align:left;font-size:13px;border-bottom:1px solid var(--border);}
-th{color:var(--text3);font-weight:700;text-transform:uppercase;font-size:11px;letter-spacing:.5px;}
-tr:last-child td{border-bottom:none;}
-.mono{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text2);}
-.badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;}
-.badge.ok{background:rgba(16,185,129,.15);color:var(--success);}
-.badge.banned{background:rgba(239,68,68,.15);color:var(--danger);}
-.btn{border:none;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;margin-right:6px;}
-.btn.ban{background:rgba(245,158,11,.15);color:var(--warn);}
-.btn.unban{background:rgba(16,185,129,.15);color:var(--success);}
-.btn.del{background:rgba(239,68,68,.15);color:var(--danger);}
-.btn:disabled{opacity:.5;cursor:default;}
-.refresh{background:var(--accent);color:#fff;border:none;padding:9px 18px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;margin-bottom:16px;font-family:inherit;}
-.wrap{overflow-x:auto;}
+:root{--bg:#080a10;--bg2:#0d1020;--bg3:#131828;--border:#1e2540;--text:#e8eef8;--text2:#98a8c8;--text3:#5a6888;--accent:#2563eb;--accent2:#60a5fa;--danger:#ef4444;--warn:#f59e0b;--success:#10b981;--radius:14px}
+*{box-sizing:border-box;margin:0;padding:0}body{background:var(--bg);color:var(--text);font-family:'Exo 2',sans-serif;min-height:100vh;padding:20px}h1{font-family:Orbitron,sans-serif;font-size:22px;margin-bottom:4px;background:linear-gradient(135deg,#60a5fa,#2563eb);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent}.sub{color:var(--text3);font-size:13px;margin-bottom:18px}.state{padding:40px 20px;text-align:center;color:var(--text2)}.state.err{color:var(--danger)}.toolbar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px}.btn,.refresh{border:none;padding:8px 12px;border-radius:9px;font-size:12px;font-weight:800;cursor:pointer;font-family:inherit}.refresh{background:var(--accent);color:#fff}.btn.blue{background:rgba(37,99,235,.15);color:var(--accent2)}.btn.ban{background:rgba(245,158,11,.15);color:var(--warn)}.btn.unban{background:rgba(16,185,129,.15);color:var(--success)}.btn.del{background:rgba(239,68,68,.15);color:var(--danger)}.btn.gray{background:rgba(152,168,200,.12);color:var(--text2)}.btn:disabled{opacity:.5;cursor:default}.tabs{display:flex;gap:6px;margin-bottom:14px;flex-wrap:wrap}.tab{background:var(--bg2);color:var(--text2);border:1px solid var(--border);padding:9px 14px;border-radius:10px;cursor:pointer;font-weight:800}.tab.active{background:rgba(37,99,235,.18);color:var(--accent2);border-color:rgba(96,165,250,.35)}.panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px}.wrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:1050px}th,td{padding:10px 9px;text-align:left;font-size:12px;border-bottom:1px solid var(--border);vertical-align:top}th{color:var(--text3);font-weight:800;text-transform:uppercase;font-size:10px;letter-spacing:.5px}tr:last-child td{border-bottom:none}.mono{font-family:'JetBrains Mono',monospace;font-size:11px;color:var(--text2)}.badge{display:inline-block;padding:3px 8px;border-radius:99px;font-size:10px;font-weight:800}.badge.ok{background:rgba(16,185,129,.15);color:var(--success)}.badge.banned{background:rgba(239,68,68,.15);color:var(--danger)}.badge.admin{background:rgba(96,165,250,.15);color:var(--accent2)}.iplist{display:flex;gap:4px;flex-wrap:wrap}.ip{font-family:'JetBrains Mono',monospace;font-size:10px;background:var(--bg3);padding:3px 5px;border-radius:5px;color:var(--text2)}.muted{color:var(--text3)}.modal{position:fixed;inset:0;z-index:50;background:rgba(0,0,0,.75);backdrop-filter:blur(8px);display:none;align-items:center;justify-content:center;padding:18px}.box{width:min(760px,100%);max-height:90vh;overflow:auto;background:var(--bg2);border:1px solid var(--border);border-radius:18px;padding:18px;box-shadow:0 20px 70px rgba(0,0,0,.5)}.box h2{font-size:18px;margin-bottom:5px}.box .hint{color:var(--text3);font-size:12px;margin-bottom:14px}.row{display:flex;gap:8px;align-items:center;justify-content:space-between;padding:10px 0;border-bottom:1px solid var(--border)}.row:last-child{border-bottom:0}.device{font-weight:800}.small{font-size:11px;color:var(--text3);margin-top:3px}.field{display:grid;gap:6px;margin-bottom:10px}.field label{font-size:11px;color:var(--text3);font-weight:800}.field input,.field select,.field textarea{width:100%;padding:10px 11px;border:1px solid var(--border);border-radius:9px;background:var(--bg3);color:var(--text);font:inherit;outline:none}.field textarea{min-height:70px;resize:vertical}.checks{display:grid;gap:8px;padding:10px 0}.check{display:flex;gap:8px;align-items:center;color:var(--text2);font-size:12px}.actions{display:flex;gap:8px;justify-content:flex-end;margin-top:14px;flex-wrap:wrap}.dangerbox{padding:10px;border:1px solid rgba(239,68,68,.25);background:rgba(239,68,68,.06);border-radius:10px;color:#fca5a5;font-size:12px}.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:12px}.stat{padding:12px;background:var(--bg2);border:1px solid var(--border);border-radius:12px}.stat b{display:block;font-size:18px}.stat span{font-size:10px;color:var(--text3)}@media(max-width:700px){body{padding:10px}.stats{grid-template-columns:repeat(2,1fr)}}
 </style>
 </head>
 <body>
 <h1>🛡️ Адмін-панель</h1>
-<div class="sub">TS Розклад — акаунти на сервері</div>
+<div class="sub">TS Розклад — керування акаунтами, сесіями, IP та безпекою</div>
 <div id="root"><div class="state">Завантаження...</div></div>
+
+<div class="modal" id="modal">
+  <div class="box" id="modalBox"></div>
+</div>
 
 <script>
 const API='/.netlify/functions/admin';
-
-function authHeaders(){
-  const token=localStorage.getItem('ts_token');
-  return token?{'Authorization':'Bearer '+token}:{};
-}
-
-async function callAdmin(action, extra){
-  const res=await fetch(API,{
-    method:'POST',
-    headers:{'Content-Type':'application/json',...authHeaders()},
-    body:JSON.stringify({action,...extra})
-  });
-  const data=await res.json();
-  if(!res.ok) throw new Error(data.error||'Помилка');
-  return data;
-}
-
-function fmtDate(ts){
-  if(!ts) return '—';
-  return new Date(ts).toLocaleString('uk-UA',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
-}
+let users=[], currentTab='users', currentAdmin='';
+function authHeaders(){const t=localStorage.getItem('ts_token');return t?{'Authorization':'Bearer '+t}:{}}
+async function callAdmin(action,extra={}){const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({action,...extra})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Помилка');return d}
+function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+function fmt(ts){return ts?new Date(ts).toLocaleString('uk-UA',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—'}
+function openModal(html){document.getElementById('modalBox').innerHTML=html;document.getElementById('modal').style.display='flex'}
+function closeModal(){document.getElementById('modal').style.display='none'}
+document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='modal')closeModal()});
 
 async function load(){
   const root=document.getElementById('root');
-  if(!localStorage.getItem('ts_token')){
-    root.innerHTML='<div class="state err">Спочатку увійди в основному застосунку (index.html) на цьому пристрої.</div>';
-    return;
-  }
+  if(!localStorage.getItem('ts_token')){root.innerHTML='<div class="state err">Увійди в основному застосунку на цьому пристрої.</div>';return}
   root.innerHTML='<div class="state">Завантаження...</div>';
-  try{
-    const data=await callAdmin('list-users');
-    render(data.users);
-  }catch(err){
-    root.innerHTML=`<div class="state err">❌ ${escapeHtml(err.message)}</div>`;
-  }
+  try{const d=await callAdmin('list-users');users=d.users||[];currentAdmin=d.currentAdmin||'';render()}
+  catch(e){root.innerHTML=`<div class="state err">❌ ${esc(e.message)}</div>`}
 }
-
-function escapeHtml(s){
-  return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-}
-
-function render(users){
+function render(){
   const root=document.getElementById('root');
-  if(!users.length){
-    root.innerHTML='<div class="state">Ще немає зареєстрованих акаунтів.</div>';
-    return;
-  }
-  const rows=users.map(u=>`
-    <tr>
-      <td><b>${escapeHtml(u.username)}</b></td>
-      <td class="mono">${escapeHtml(u.email||'—')}</td>
-      <td class="mono">${fmtDate(u.createdAt)}</td>
-      <td class="mono">${fmtDate(u.lastActive)}</td>
-      <td class="mono">${u.subjectsCount} предм. · ${u.notesCount} нотат.</td>
-      <td class="mono">${u.pushSubscriptions}</td>
-      <td>${u.banned?'<span class="badge banned">Заблоковано</span>':'<span class="badge ok">Активний</span>'}</td>
-      <td style="white-space:nowrap">
-        <button class="btn ${u.banned?'unban':'ban'}" onclick="toggleBan('${escapeHtml(u.username)}',${!!u.banned})">${u.banned?'Розблокувати':'Заблокувати'}</button>
-        <button class="btn del" onclick="removeUser('${escapeHtml(u.username)}')">Видалити</button>
-      </td>
-    </tr>`).join('');
-  root.innerHTML=`
-    <button class="refresh" onclick="load()">🔄 Оновити</button>
-    <div class="wrap"><table>
-      <thead><tr>
-        <th>Логін</th><th>Email</th><th>Реєстрація</th><th>Остання активність</th>
-        <th>Дані</th><th>Push</th><th>Статус</th><th></th>
-      </tr></thead>
-      <tbody>${rows}</tbody>
-    </table></div>`;
+  const active=users.filter(u=>!u.banned).length,banned=users.filter(u=>u.banned).length,admins=users.filter(u=>u.role==='admin').length,sessions=users.reduce((n,u)=>n+u.sessionsCount,0);
+  root.innerHTML=`<div class="stats"><div class="stat"><b>${users.length}</b><span>Користувачів</span></div><div class="stat"><b>${active}</b><span>Активних</span></div><div class="stat"><b>${banned}</b><span>Заблокованих</span></div><div class="stat"><b>${sessions}</b><span>Активних сесій</span></div></div>
+  <div class="tabs"><button class="tab ${currentTab==='users'?'active':''}" onclick="switchTab('users')">👥 Користувачі</button><button class="tab ${currentTab==='ips'?'active':''}" onclick="switchTab('ips')">🚫 IP-блокування</button><button class="tab ${currentTab==='audit'?'active':''}" onclick="switchTab('audit')">📋 Журнал</button></div>
+  <div id="content"></div>`;
+  if(currentTab==='users')renderUsers();else if(currentTab==='ips')renderIps();else renderAudit();
 }
-
-async function toggleBan(username, isBanned){
-  const action=isBanned?'unban-user':'ban-user';
-  if(!confirm(`${isBanned?'Розблокувати':'Заблокувати'} акаунт "${username}"?`))return;
-  try{
-    await callAdmin(action,{username});
-    load();
-  }catch(err){ alert('❌ '+err.message); }
+function switchTab(t){currentTab=t;render();if(t==='ips')loadIps();if(t==='audit')loadAudit()}
+function renderUsers(){
+  const c=document.getElementById('content');
+  if(!users.length){c.innerHTML='<div class="panel state">Ще немає акаунтів.</div>';return}
+  const rows=users.map(u=>`<tr>
+  <td><b>${esc(u.username)}</b><br>${u.role==='admin'?'<span class="badge admin">ADMIN</span>':'<span class="badge">USER</span>'}</td>
+  <td class="mono">${esc(u.email||'—')}<br>${u.emailVerified?'✅ підтверджено':'⚪ не підтверджено'}</td>
+  <td class="mono">${u.sessionsCount}<br><button class="btn blue" onclick="showSessions('${esc(u.username)}')">Пристрої</button></td>
+  <td><div class="iplist">${(u.ips||[]).map(x=>`<span class="ip">${esc(x)}</span>`).join('')||'<span class="muted">—</span>'}</div></td>
+  <td class="mono">${fmt(u.lastActive)}</td>
+  <td>${u.banned?'<span class="badge banned">ЗАБЛОКОВАНО</span>':'<span class="badge ok">АКТИВНИЙ</span>'}</td>
+  <td style="white-space:nowrap">
+    <button class="btn blue" onclick="editEmail('${esc(u.username)}','${esc(u.email||'')}')">✉️ Email</button>
+    <button class="btn blue" onclick="editRole('${esc(u.username)}','${u.role||'user'}')">👑 Роль</button>
+    <button class="btn ${u.banned?'unban':'ban'}" onclick="showBan('${esc(u.username)}',${u.banned})">${u.banned?'Розблокувати':'Заблокувати'}</button>
+    <button class="btn del" onclick="showDelete('${esc(u.username)}')">Видалити</button>
+  </td></tr>`).join('');
+  c.innerHTML=`<div class="panel"><div class="toolbar"><button class="refresh" onclick="load()">🔄 Оновити</button></div><div class="wrap"><table><thead><tr><th>Користувач</th><th>Email</th><th>Сесії</th><th>IP</th><th>Активність</th><th>Статус</th><th>Дії</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
-
-async function removeUser(username){
-  if(!confirm(`Видалити акаунт "${username}" разом з усіма його даними? Це незворотньо.`))return;
-  try{
-    await callAdmin('delete-user',{username});
-    load();
-  }catch(err){ alert('❌ '+err.message); }
+function showSessions(username){
+  callAdmin('list-sessions',{username}).then(d=>{
+    const rows=(d.sessions||[]).map(s=>`<div class="row"><div><div class="device">${esc(s.device?.type||'💻')} · ${esc(s.device?.os||'')} · ${esc(s.device?.browser||'')}</div><div class="small mono">IP: ${esc(s.ip)} · створено: ${fmt(s.createdAt)} · активність: ${fmt(s.lastActive)}</div><div class="small">${esc(s.userAgent)}</div></div><button class="btn del" onclick="revokeSession('${esc(username)}','${esc(s.id)}')">Завершити</button></div>`).join('');
+    openModal(`<h2>📱 Сесії: ${esc(username)}</h2><div class="hint">Активних сесій: ${(d.sessions||[]).length}</div>${rows||'<div class="state">Активних сесій немає.</div>'}<div class="actions"><button class="btn gray" onclick="closeModal()">Закрити</button><button class="btn del" onclick="revokeAll('${esc(username)}')">Завершити всі</button></div>`);
+  }).catch(e=>alert('❌ '+e.message))
 }
+async function revokeSession(username,id){try{await callAdmin('revoke-session',{username,sessionId:id});showSessions(username);load()}catch(e){alert('❌ '+e.message)}}
+async function revokeAll(username){if(!confirm('Завершити всі сесії цього користувача?'))return;try{await callAdmin('revoke-all-sessions',{username});closeModal();load()}catch(e){alert('❌ '+e.message)}}
 
+function editEmail(username,current){const v=prompt(`Email для ${username}:`,current||'');if(v===null)return;const email=v.trim();if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){alert('❌ Невірний формат email');return}callAdmin('update-email',{username,email}).then(()=>load()).catch(e=>alert('❌ '+e.message))}
+function editRole(username,current){
+  if(username===currentAdmin){alert('Головного адміністратора краще не змінювати.');return}
+  openModal(`<h2>👑 Роль: ${esc(username)}</h2><div class="field"><label>РОЛЬ</label><select id="roleSelect"><option value="user" ${current==='user'?'selected':''}>Користувач</option><option value="admin" ${current==='admin'?'selected':''}>Адміністратор</option></select></div><div class="actions"><button class="btn gray" onclick="closeModal()">Скасувати</button><button class="btn blue" onclick="saveRole('${esc(username)}')">Зберегти</button></div>`);
+}
+async function saveRole(username){try{await callAdmin('set-role',{username,role:document.getElementById('roleSelect').value});closeModal();load()}catch(e){alert('❌ '+e.message)}}
+
+function showBan(username,isBanned){
+ if(isBanned){if(!confirm(`Розблокувати ${username}?`))return;callAdmin('unban-user',{username}).then(()=>load()).catch(e=>alert('❌ '+e.message));return}
+ openModal(`<h2>🚫 Заблокувати: ${esc(username)}</h2><div class="field"><label>ПРИЧИНА</label><textarea id="banReason" placeholder="Наприклад: спам, порушення правил..."></textarea></div><div class="checks"><label class="check"><input id="blockIp" type="checkbox"> Одночасно заблокувати IP-адреси активних сесій</label></div><div class="field"><label>ТЕРМІН IP-БЛОКУ</label><select id="ipDuration"><option value="hour">1 година</option><option value="day">1 день</option><option value="week">7 днів</option><option value="forever" selected>Назавжди</option></select></div><div class="dangerbox">Бан акаунта одразу завершить усі його активні сесії.</div><div class="actions"><button class="btn gray" onclick="closeModal()">Скасувати</button><button class="btn del" onclick="doBan('${esc(username)}')">Заблокувати</button></div>`);
+}
+async function doBan(username){try{await callAdmin('ban-user',{username,reason:document.getElementById('banReason').value,blockIp:document.getElementById('blockIp').checked,ipDuration:document.getElementById('ipDuration').value});closeModal();load()}catch(e){alert('❌ '+e.message)}}
+function showDelete(username){openModal(`<h2>🗑️ Видалити: ${esc(username)}</h2><div class="dangerbox">Це видалить акаунт і його серверні дані. Скасувати операцію після виконання не можна.</div><div class="checks"><label class="check"><input id="deleteBlockIp" type="checkbox"> Також заблокувати IP активних сесій</label></div><div class="field"><label>ТЕРМІН IP-БЛОКУ</label><select id="deleteIpDuration"><option value="hour">1 година</option><option value="day">1 день</option><option value="week">7 днів</option><option value="forever" selected>Назавжди</option></select></div><div class="actions"><button class="btn gray" onclick="closeModal()">Скасувати</button><button class="btn del" onclick="doDelete('${esc(username)}')">Видалити</button></div>`)}
+async function doDelete(username){if(!confirm(`Остаточно видалити ${username}?`))return;try{await callAdmin('delete-user',{username,blockIp:document.getElementById('deleteBlockIp').checked,ipDuration:document.getElementById('deleteIpDuration').value});closeModal();load()}catch(e){alert('❌ '+e.message)}}
+
+async function loadIps(){try{const d=await callAdmin('ip-list');renderIpList(d.bans||[])}catch(e){document.getElementById('content').innerHTML=`<div class="panel state err">❌ ${esc(e.message)}</div>`}}
+function renderIps(bans){
+ const c=document.getElementById('content');
+ const rows=bans.map(b=>`<tr><td class="mono">${esc(b.ip)}</td><td>${esc(b.reason||'—')}</td><td>${esc(b.username||'—')}</td><td class="mono">${fmt(b.createdAt)}</td><td>${b.expiresAt?fmt(b.expiresAt):'Назавжди'}</td><td><button class="btn unban" onclick="unbanIp('${esc(b.ip)}')">Розблокувати</button></td></tr>`).join('');
+ c.innerHTML=`<div class="panel"><div class="toolbar"><button class="btn blue" onclick="showIpBan()">➕ Заблокувати IP вручну</button><button class="refresh" onclick="loadIps()">🔄 Оновити</button></div><div class="wrap"><table><thead><tr><th>IP</th><th>Причина</th><th>Користувач</th><th>Створено</th><th>До</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="6" class="muted">Заблокованих IP немає.</td></tr>'}</tbody></table></div></div>`;
+}
+function showIpBan(){openModal(`<h2>🚫 Заблокувати IP</h2><div class="field"><label>IP-АДРЕСА</label><input id="manualIp" placeholder="185.123.45.67"></div><div class="field"><label>ПРИЧИНА</label><input id="manualReason" placeholder="Спам"></div><div class="field"><label>ТЕРМІН</label><select id="manualDuration"><option value="hour">1 година</option><option value="day">1 день</option><option value="week">7 днів</option><option value="forever">Назавжди</option></select></div><div class="actions"><button class="btn gray" onclick="closeModal()">Скасувати</button><button class="btn del" onclick="doIpBan()">Заблокувати</button></div>`)}
+async function doIpBan(){try{await callAdmin('ip-ban',{ip:document.getElementById('manualIp').value.trim(),reason:document.getElementById('manualReason').value,duration:document.getElementById('manualDuration').value});closeModal();loadIps()}catch(e){alert('❌ '+e.message)}}
+async function unbanIp(ip){if(!confirm(`Розблокувати IP ${ip}?`))return;try{await callAdmin('ip-unban',{ip});loadIps()}catch(e){alert('❌ '+e.message)}}
+
+async function loadAudit(){try{const d=await callAdmin('audit-log');const rows=(d.log||[]).map(x=>`<div class="row"><div><b>${esc(x.action)}</b><div class="small">${fmt(x.at)} · адмін: ${esc(x.adminUsername)}</div><div class="small mono">${esc(JSON.stringify(x.details||{}))}</div></div></div>`).join('');document.getElementById('content').innerHTML=`<div class="panel">${rows||'<div class="state">Журнал порожній.</div>'}</div>`}catch(e){document.getElementById('content').innerHTML=`<div class="panel state err">❌ ${esc(e.message)}</div>`}}
 load();
 </script>
 </body>
