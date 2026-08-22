@@ -15,16 +15,20 @@ exports.handler = async (event) => {
 
   try {
     const body = JSON.parse(event.body || '{}');
-    const { schedule, subjects, cfg } = body;
+    const { userId, schedule, subjects, cfg, notes } = body;
 
+    if (!userId) {
+      return { statusCode: 400, body: JSON.stringify({ error: 'Немає userId' }) };
+    }
     if (!schedule || !subjects) {
       return { statusCode: 400, body: JSON.stringify({ error: 'Немає даних розкладу' }) };
     }
 
     const s = store();
-    await s.setJSON('schedule-data', {
+    await s.setJSON(`schedule-data:${userId}`, {
       schedule,
       subjects,
+      notes: notes || [],
       notif10: cfg?.notif10 !== false,
       notif5: cfg?.notif5 !== false,
       updatedAt: Date.now()

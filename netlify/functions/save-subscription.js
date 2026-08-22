@@ -15,14 +15,18 @@ exports.handler = async (event) => {
 
   try {
     const body = JSON.parse(event.body || '{}');
-    const { subscription, action } = body;
+    const { userId, subscription, action } = body;
 
+    if (!userId) {
+      return { statusCode: 400, body: JSON.stringify({ error: 'Немає userId' }) };
+    }
     if (!subscription || !subscription.endpoint) {
       return { statusCode: 400, body: JSON.stringify({ error: 'Немає підписки' }) };
     }
 
     const s = store();
-    const existing = (await s.get('subscriptions', { type: 'json' })) || [];
+    const key = `subscriptions:${userId}`;
+    const existing = (await s.get(key, { type: 'json' })) || [];
 
     let updated;
     if (action === 'unsubscribe') {
@@ -32,7 +36,7 @@ exports.handler = async (event) => {
       updated.push(subscription);
     }
 
-    await s.setJSON('subscriptions', updated);
+    await s.setJSON(key, updated);
 
     return {
       statusCode: 200,

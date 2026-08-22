@@ -14,8 +14,13 @@ exports.handler = async (event) => {
   }
 
   try {
+    const userId = event.queryStringParameters?.userId;
+    if (!userId) {
+      return { statusCode: 400, body: JSON.stringify({ error: 'Немає userId' }) };
+    }
+
     const s = store();
-    const data = await s.get('schedule-data', { type: 'json' });
+    const data = await s.get(`schedule-data:${userId}`, { type: 'json' });
 
     return {
       statusCode: 200,
