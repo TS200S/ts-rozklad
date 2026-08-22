@@ -81,7 +81,7 @@ exports.handler = async (event) => {
         });
       }
       users.sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-      return json(200, { ok: true, users, currentAdmin: admin.user.username });
+      return json(200, { ok: true, users, currentAdmin: admin.user.username, currentIsMaster: admin.user.username === admin.master });
     }
 
     if (action === 'list-sessions') {
@@ -233,6 +233,7 @@ exports.handler = async (event) => {
       if (username === master && role !== 'admin') return json(400, { error: 'Головного адміністратора не можна позбавити прав' });
       const user = await s.get(`user:${username}`, { type: 'json' }).catch(() => null);
       if (!user) return json(404, { error: 'Користувача не знайдено' });
+      if (username === admin.user.username) return json(400, { error: 'Не можна змінювати власну роль' });
       if (!canManageTarget(admin, user)) return json(403, { error: 'Звичайний адміністратор не може змінювати роль іншого адміністратора' });
       user.role = isMasterUsername(username, master) ? 'admin' : role;
       await s.setJSON(`user:${username}`, user);
