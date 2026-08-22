@@ -460,15 +460,14 @@ button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.t
 #account-block-overlay{position:fixed;inset:0;z-index:20000;background:rgba(0,0,0,.82);backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;padding:20px;}
 #account-block-box{max-width:430px;width:100%;padding:26px;border-radius:20px;background:var(--bg2);border:1px solid var(--border2);box-shadow:var(--shadow);text-align:center;}
 #account-block-box .bt{font-size:22px;font-weight:900;margin-bottom:8px}.account-block-msg{color:var(--text2);line-height:1.5;font-size:13px}
-.mail-notice{padding:11px 12px;margin:10px 0 12px;border:1px solid rgba(96,165,250,.25);background:rgba(37,99,235,.10);border-radius:11px;color:var(--text2);font-size:11px;line-height:1.45}.mail-notice b{color:var(--accent2)}<style>
-.ban-modal{position:fixed;inset:0;z-index:21000;background:rgba(0,0,0,.78);backdrop-filter:blur(12px);display:none;align-items:center;justify-content:center;padding:18px}
-.ban-card{width:min(470px,100%);background:var(--bg2);border-radius:22px;padding:24px;box-shadow:0 24px 90px rgba(0,0,0,.55)}
-.ban-card.account{border:1px solid rgba(239,68,68,.7);box-shadow:0 0 35px rgba(239,68,68,.2),0 24px 90px rgba(0,0,0,.55)}
-.ban-card.ip{border:1px solid rgba(245,158,11,.75);box-shadow:0 0 35px rgba(245,158,11,.2),0 24px 90px rgba(0,0,0,.55)}
-.ban-icon{font-size:38px}.ban-title{font-size:23px;font-weight:900;margin:6px 0}.account .ban-title{color:#f87171}.ip .ban-title{color:#fbbf24}
-.ban-project{color:var(--text2);font-size:13px;line-height:1.55}.ban-section{margin-top:14px;padding:12px;border-radius:12px;background:var(--bg3);border:1px solid var(--border);font-size:12px}.ban-label{font-size:10px;color:var(--text3);font-weight:900;text-transform:uppercase;margin-bottom:4px}.ban-value{white-space:pre-wrap;overflow-wrap:anywhere}.ban-timer{font-family:monospace;font-weight:800;margin-top:5px}
-</style>
-</style>
+.mail-notice{padding:11px 12px;margin:10px 0 12px;border:1px solid rgba(96,165,250,.25);background:rgba(37,99,235,.10);border-radius:11px;color:var(--text2);font-size:11px;line-height:1.45}.mail-notice b{color:var(--accent2)}</style>
+<style>
+ .ban-modal{position:fixed;inset:0;width:100vw;height:100vh;z-index:999999;background:rgba(0,0,0,.82);backdrop-filter:blur(12px);display:none;align-items:center;justify-content:center;padding:20px;box-sizing:border-box}
+.ban-card{width:min(470px,calc(100vw - 40px));box-sizing:border-box;background:var(--bg2);border-radius:22px;padding:24px;box-shadow:0 24px 90px rgba(0,0,0,.65);position:relative}
+.ban-card.account{border:1px solid rgba(239,68,68,.78);box-shadow:0 0 0 1px rgba(239,68,68,.12),0 0 45px rgba(239,68,68,.25),0 24px 90px rgba(0,0,0,.65)}
+.ban-card.ip{border:1px solid rgba(245,158,11,.82);box-shadow:0 0 0 1px rgba(245,158,11,.12),0 0 45px rgba(245,158,11,.25),0 24px 90px rgba(0,0,0,.65)}
+.ban-icon{font-size:40px}.ban-title{font-size:23px;font-weight:900;margin:7px 0}.account .ban-title{color:#f87171}.ip .ban-title{color:#fbbf24}
+.ban-project{color:var(--text2);font-size:13px;line-height:1.55}.ban-section{margin-top:15px;padding:13px;border-radius:13px;background:var(--bg3);border:1px solid var(--border);font-size:12px;line-height:1.5}.ban-label{font-size:10px;color:var(--text3);font-weight:900;text-transform:uppercase;letter-spacing:.55px;margin-bottom:5px}.ban-value{white-space:pre-wrap;overflow-wrap:anywhere}.ban-timer{font-family:monospace;font-weight:800;margin-top:6px}</style>
 </head>
 <body>
 
@@ -1521,6 +1520,13 @@ function showAuthView(view){
   });
 }
 
+let sessionWatchStarted=false;
+function startSessionWatcher(){
+  if(sessionWatchStarted)return;
+  sessionWatchStarted=true;
+  setTimeout(checkSessionStatus,250);
+  setInterval(checkSessionStatus,10000);
+}
 function onAuthSuccess(data){
   localStorage.setItem('ts_userid',data.userId);
   localStorage.setItem('ts_username',data.username);
@@ -1529,7 +1535,7 @@ function onAuthSuccess(data){
   if(data.email) localStorage.setItem('ts_email',data.email); else localStorage.removeItem('ts_email');
   localStorage.setItem('ts_is_admin',data.role==='admin'?'1':'0');
   document.getElementById('lock-screen').style.display='none';
-  setTimeout(checkEmailSetup,100);setTimeout(checkAdminRole,150);setTimeout(checkSessionStatus,250);setInterval(checkSessionStatus,30000);
+  setTimeout(checkEmailSetup,100);setTimeout(checkAdminRole,150);startSessionWatcher();
   setTimeout(initNotifications,1500);
   setTimeout(pullFromServer,1500);
   setTimeout(syncNotifLogFromSW,1500);
@@ -1792,10 +1798,17 @@ function showBanModal(type,d){
  document.getElementById('ban-modal').style.display='flex';
 }
 function updateBanTimer(){const e=document.getElementById('ban-timer');if(!e)return;if(!banEndsAt){e.textContent='';return}const x=Math.max(0,Math.floor((banEndsAt-Date.now())/1000));if(!x){e.textContent='Термін блокування завершено';clearInterval(banTimerId);return}const d=Math.floor(x/86400),h=Math.floor(x%86400/3600),m=Math.floor(x%3600/60),s=x%60;e.textContent=`⏱️ До розблокування: ${d?d+' д ':''}${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`}
-function closeBanModal(){document.getElementById('ban-modal').style.display='none';clearInterval(banTimerId)}
-function forceLocalLogout(){
+function closeBanModal(){
+  document.getElementById('ban-modal').style.display='none';
+  clearInterval(banTimerId);
+  forceLocalLogout();
+}
+function clearLocalAuth(){
   localStorage.removeItem('ts_userid');localStorage.removeItem('ts_username');localStorage.removeItem('ts_token');
   localStorage.removeItem('ts_authed');localStorage.removeItem('ts_email');localStorage.removeItem('ts_is_admin');
+}
+function forceLocalLogout(){
+  clearLocalAuth();
   location.reload();
 }
 
@@ -1811,13 +1824,18 @@ async function checkSessionStatus(){
   const token=localStorage.getItem('ts_token');
   if(!token)return;
   try{
-    const res=await fetch('/.netlify/functions/session-status',{headers:{'Authorization':'Bearer '+token}});
+    const res=await fetch('/.netlify/functions/session-status',{
+      headers:{'Authorization':'Bearer '+token,'Cache-Control':'no-cache'},
+      cache:'no-store'
+    });
     const data=await res.json().catch(()=>({}));
     if(res.status===403 && data.banned){
+      clearLocalAuth();
       showBanModal('account',{reason:data.banReason,expiresAt:data.banExpiresAt});
       return;
     }
     if(res.status===403 && data.ipBlocked){
+      clearLocalAuth();
       showBanModal('ip',{reason:data.ipBanReason,expiresAt:data.ipBanExpiresAt});
       return;
     }
@@ -1841,7 +1859,7 @@ function logoutAccount(){
   localStorage.removeItem('ts_is_admin');
   location.reload();
 }
-if(localStorage.getItem('ts_authed')==='1'&&localStorage.getItem('ts_userid')){document.getElementById('lock-screen').style.display='none';setTimeout(checkEmailSetup,100);setTimeout(checkAdminRole,150);setTimeout(checkSessionStatus,250);setInterval(checkSessionStatus,30000);}
+if(localStorage.getItem('ts_authed')==='1'&&localStorage.getItem('ts_userid')){document.getElementById('lock-screen').style.display='none';setTimeout(checkEmailSetup,100);setTimeout(checkAdminRole,150);startSessionWatcher();}
 
 // ===== SUBJECTS MODAL =====
 function buildColorPicker(sel){selColor=sel||COLORS[0];document.getElementById('color-picker').innerHTML=COLORS.map(c=>`<div onclick="pickColor('${c}')" style="width:30px;height:30px;border-radius:50%;background:${c};cursor:pointer;border:3px solid ${c===selColor?'#fff':'transparent'};transition:border-color .15s;box-sizing:border-box;flex-shrink:0"></div>`).join('');}
