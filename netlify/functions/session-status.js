@@ -9,8 +9,21 @@ exports.handler = async (event) => {
     const ipBan = await enforceIpBan(s, event);
     if (ipBan) return { statusCode: 403, headers: {'Content-Type':'application/json'}, body: JSON.stringify({error:'Цей IP-адрес заблоковано',ipBlocked:true,
       ipBanReason:ipBan.reason||'',ipBanExpiresAt:Number(ipBan.expiresAt||0),ipBanPermanent:!Number(ipBan.expiresAt||0)}) };
-    const sess = await validateSession(s, extractToken(event));
-    if (!sess) return { statusCode: 401, headers:{'Content-Type':'application/json'}, body: JSON.stringify({ error:'Сесія недійсна', sessionExpired:true }) };
+    const token = extractToken(event);
+    const sess = await validateSession(s, token);
+    if (!sess) {
+      const revoked = token ? await s.get(`revoked-ban:${token}`, {type:'json'}).catch(()=>null) : null;
+      if (revoked) {
+        const exp=Number(revoked.expiresAt||0);
+        if (exp && exp <= Date.now()) {
+          await s.delete(`revoked-ban:${token}`).catch(()=>{});
+          return {statusCode:401,headers:{'Content-Type':'application/json'},body:JSON.stringify({error:'Сесія завершена',sessionExpired:true})};
+        }
+        return {statusCode:403,headers:{'Content-Type':'application/json'},body:JSON.stringify({
+          error:'Акаунт заблоковано',banned:true,banReason:revoked.reason||'',banExpiresAt:exp,banPermanent:!exp})};
+      }
+      return { statusCode:401, headers:{'Content-Type':'application/json'}, body: JSON.stringify({ error:'Сесія недійсна', sessionExpired:true }) };
+    }
     if (sess.banned) {
       const user=await s.get(`user:${sess.username}`,{type:'json'}).catch(()=>null);
       if(user?.banned){

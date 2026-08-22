@@ -131,6 +131,15 @@ exports.handler = async (event) => {
       const sessionsBeforeBan = await listSessionsForUser(s, user.userId);
       const sessionIps = [...new Set(sessionsBeforeBan.map(x => x.ip).filter(x => x && x !== 'unknown'))];
       await s.setJSON(`user:${username}`, user);
+      if (isBan) {
+        for (const session of sessionsBeforeBan) {
+          await s.setJSON(`revoked-ban:${session.token}`, {
+            reason: user.banReason || '',
+            expiresAt: user.banExpiresAt || 0,
+            createdAt: Date.now()
+          }).catch(()=>{});
+        }
+      }
       await deleteAllSessionsForUser(s, user.userId);
 
       if (isBan && body.blockIp) {
