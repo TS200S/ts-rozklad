@@ -1,12 +1,5 @@
-const { getStore } = require('@netlify/blobs');
-
-function store() {
-  return getStore({
-    name: 'ts-app',
-    siteID: process.env.NETLIFY_SITE_ID,
-    token: process.env.NETLIFY_AUTH_TOKEN
-  });
-}
+const { store } = require('./lib/store');
+const { validateSession, extractToken } = require('./lib/session');
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
@@ -14,17 +7,20 @@ exports.handler = async (event) => {
   }
 
   try {
-    const body = JSON.parse(event.body || '{}');
-    const { userId, schedule, subjects, cfg, notes } = body;
-
-    if (!userId) {
-      return { statusCode: 400, body: JSON.stringify({ error: 'Немає userId' }) };
+    const s = store();
+    const sess = await validateSession(s, extractToken(event));
+    if (!sess) {
+      return { statusCode: 401, body: JSON.stringify({ error: 'Сесія недійсна, увійди ще раз' }) };
     }
+    const userId = sess.userId;
+
+    const body = JSON.parse(event.body || '{}');
+    const { schedule, subjects, cfg, notes } = body;
+
     if (!schedule || !subjects) {
       return { statusCode: 400, body: JSON.stringify({ error: 'Немає даних розкладу' }) };
     }
 
-    const s = store();
     await s.setJSON(`schedule-data:${userId}`, {
       schedule,
       subjects,

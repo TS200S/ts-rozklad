@@ -57,14 +57,17 @@ async function processUser(s, userId, dayIdx, curMins, dateKey) {
     const diff = slotMins - curMins;
     const subj = (data.subjects || []).find(x => x.id === sl.subjId) || { name: 'Пара' };
 
-    if (data.notif10 && diff === 10) {
+    // Windows instead of exact-minute equality: cron-job.org occasionally
+    // fires a minute or two late, and an exact "diff === 10" check would
+    // silently skip that reminder forever if the tick landed on diff === 9.
+    if (data.notif10 && diff <= 10 && diff >= 8) {
       const key = `${sl.time}_10`;
       if (!firedLog.fired.includes(key)) {
         firedLog.fired.push(key);
         toSend.push({ title: '⏰ ' + subj.name, body: `За 10 хвилин · Початок о ${sl.time}${subj.teacher ? ' · ' + subj.teacher : ''}` });
       }
     }
-    if (data.notif5 && diff === 5) {
+    if (data.notif5 && diff <= 5 && diff >= 3) {
       const key = `${sl.time}_5`;
       if (!firedLog.fired.includes(key)) {
         firedLog.fired.push(key);
@@ -86,13 +89,16 @@ async function processUser(s, userId, dayIdx, curMins, dateKey) {
       const diffMin = Math.round((deadlineWallTs - nowWallTs) / 60000);
       const shortText = (note.text || 'Нотатка').slice(0, 60);
 
-      if (diffMin === 1440) {
+      // Same reasoning as above: a ±10-minute window (±5 for the 1h ping)
+      // instead of an exact match, so a delayed or skipped cron tick doesn't
+      // permanently swallow a deadline reminder.
+      if (diffMin <= 1440 && diffMin > 1430) {
         const key = `note_${note.id}_24h`;
         if (!firedLog.fired.includes(key)) { firedLog.fired.push(key); toSend.push({ title: '🔔 Дедлайн завтра', body: shortText }); }
-      } else if (diffMin === 180) {
+      } else if (diffMin <= 180 && diffMin > 170) {
         const key = `note_${note.id}_3h`;
         if (!firedLog.fired.includes(key)) { firedLog.fired.push(key); toSend.push({ title: '⏳ Дедлайн наближається — 3 години', body: shortText }); }
-      } else if (diffMin === 60) {
+      } else if (diffMin <= 60 && diffMin > 50) {
         const key = `note_${note.id}_1h`;
         if (!firedLog.fired.includes(key)) { firedLog.fired.push(key); toSend.push({ title: '🚨 Залишилась 1 година! Роби швидше', body: shortText }); }
       } else if (diffMin <= 0) {

@@ -1,12 +1,5 @@
-const { getStore } = require('@netlify/blobs');
-
-function store() {
-  return getStore({
-    name: 'ts-app',
-    siteID: process.env.NETLIFY_SITE_ID,
-    token: process.env.NETLIFY_AUTH_TOKEN
-  });
-}
+const { store } = require('./lib/store');
+const { validateSession, extractToken } = require('./lib/session');
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'GET') {
@@ -14,13 +7,13 @@ exports.handler = async (event) => {
   }
 
   try {
-    const userId = event.queryStringParameters?.userId;
-    if (!userId) {
-      return { statusCode: 400, body: JSON.stringify({ error: 'Немає userId' }) };
+    const s = store();
+    const sess = await validateSession(s, extractToken(event));
+    if (!sess) {
+      return { statusCode: 401, body: JSON.stringify({ error: 'Сесія недійсна, увійди ще раз' }) };
     }
 
-    const s = store();
-    const data = await s.get(`schedule-data:${userId}`, { type: 'json' });
+    const data = await s.get(`schedule-data:${sess.userId}`, { type: 'json' });
 
     return {
       statusCode: 200,
