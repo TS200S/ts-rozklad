@@ -21,7 +21,7 @@
 
 <script>
 const API='/.netlify/functions/admin';
-let users=[], currentTab='users', currentAdmin='';
+let users=[], currentTab='users', currentAdmin='', currentIsMaster=false;
 function authHeaders(){const t=localStorage.getItem('ts_token');return t?{'Authorization':'Bearer '+t}:{}}
 async function callAdmin(action,extra={}){const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({action,...extra})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Помилка');return d}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -34,7 +34,7 @@ async function load(){
   const root=document.getElementById('root');
   if(!localStorage.getItem('ts_token')){root.innerHTML='<div class="state err">Увійди в основному застосунку на цьому пристрої.</div>';return}
   root.innerHTML='<div class="state">Завантаження...</div>';
-  try{const d=await callAdmin('list-users');users=d.users||[];currentAdmin=d.currentAdmin||'';render()}
+  try{const d=await callAdmin('list-users');users=d.users||[];currentAdmin=d.currentAdmin||'';currentIsMaster=!!d.currentIsMaster;render()}
   catch(e){root.innerHTML=`<div class="state err">❌ ${esc(e.message)}</div>`}
 }
 function render(){
@@ -57,8 +57,8 @@ function renderUsers(){
   <td class="mono">${fmt(u.lastActive)}</td>
   <td>${u.banned?'<span class="badge banned">ЗАБЛОКОВАНО</span>':'<span class="badge ok">АКТИВНИЙ</span>'}</td>
   <td style="white-space:nowrap">
-    ${(u.isMaster||u.role==='admin')&&u.username!==currentAdmin?'<span class="badge admin" title="Недоступно звичайному адміністратору">ЗАХИЩЕНО</span>':''}
-    ${(!u.isMaster && !(u.role==='admin' && u.username!==currentAdmin))?`<button class="btn blue" onclick="editEmail('${esc(u.username)}','${esc(u.email||'')}')">✉️ Email</button>
+    ${u.username===currentAdmin?'<span class="badge admin" title="Власний акаунт">ЦЕ ВИ</span>':(u.isMaster?'<span class="badge admin" title="Головного адміністратора не можна блокувати або змінювати">ЗАХИЩЕНО</span>':(!currentIsMaster&&u.role==='admin'?'<span class="badge admin" title="Звичайний адміністратор не може керувати іншим адміністратором">ЗАХИЩЕНО</span>':''))}
+    ${u.username!==currentAdmin && !u.isMaster && (currentIsMaster || u.role!=='admin')?`<button class="btn blue" onclick="editEmail('${esc(u.username)}','${esc(u.email||'')}')">✉️ Email</button>
     <button class="btn blue" onclick="editRole('${esc(u.username)}','${u.role||'user'}')">👑 Роль</button>
     <button class="btn ${u.banned?'unban':'ban'}" onclick="showBan('${esc(u.username)}',${u.banned})">${u.banned?'Розблокувати':'Заблокувати'}</button>
     <button class="btn del" onclick="showDelete('${esc(u.username)}')">Видалити</button>`:''}
