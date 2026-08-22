@@ -31,19 +31,37 @@ self.addEventListener('fetch', e => {
 });
 
 // ===== SCHEDULE =====
+// The local ticker below is only a fallback for when real web push isn't
+// active (push denied/unsupported, or subscribing failed). If push IS
+// active, the server-side check-notifications cron already covers these
+// same reminders — running both at once meant getting every notification
+// twice while the app was open.
 let todaySlots = [];
 let firedToday = new Set();
+let pushActive = false;
 
 self.addEventListener('message', e => {
-  if (e.data && e.data.type === 'SCHEDULE') {
+  if (!e.data) return;
+  if (e.data.type === 'SCHEDULE') {
     todaySlots = e.data.slots || [];
+    pushActive = !!e.data.pushActive;
     firedToday = new Set();
-    // Start tick aligned to next minute
-    startTicker();
+    if (pushActive) stopTicker();
+    else startTicker();
+  }
+  if (e.data.type === 'PUSH_STATUS') {
+    pushActive = !!e.data.pushActive;
+    if (pushActive) stopTicker();
   }
 });
 
 let tickerStarted = false;
+let tickerInterval = null;
+
+function stopTicker() {
+  if (tickerInterval) { clearInterval(tickerInterval); tickerInterval = null; }
+  tickerStarted = false;
+}
 
 function startTicker() {
   if (tickerStarted) return;
@@ -54,8 +72,12 @@ function startTicker() {
   const msToNextMinute = (60 - now.getSeconds()) * 1000 - now.getMilliseconds();
 
   setTimeout(() => {
+    if (pushActive) { tickerStarted = false; return; }
     checkNotifications(); // fire at exact minute start
-    setInterval(checkNotifications, 60 * 1000);
+    tickerInterval = setInterval(() => {
+      if (pushActive) { stopTicker(); return; }
+      checkNotifications();
+    }, 60 * 1000);
   }, msToNextMinute);
 }
 

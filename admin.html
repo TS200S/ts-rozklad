@@ -1,0 +1,137 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Адмін-панель — TS Розклад</title>
+<link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;600;700;800&family=Orbitron:wght@700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#080a10;--bg2:#0d1020;--bg3:#131828;
+  --border:#1e2540;--text:#e8eef8;--text2:#98a8c8;--text3:#5a6888;
+  --accent:#2563eb;--accent2:#60a5fa;--danger:#ef4444;--warn:#f59e0b;--success:#10b981;
+  --radius:14px;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:var(--bg);color:var(--text);font-family:'Exo 2',sans-serif;min-height:100vh;padding:20px;}
+h1{font-family:'Orbitron',sans-serif;font-size:22px;margin-bottom:4px;background:linear-gradient(135deg,#60a5fa,#2563eb);-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;}
+.sub{color:var(--text3);font-size:13px;margin-bottom:22px;}
+.state{padding:40px 20px;text-align:center;color:var(--text2);}
+.state.err{color:var(--danger);}
+table{width:100%;border-collapse:collapse;background:var(--bg2);border-radius:var(--radius);overflow:hidden;border:1px solid var(--border);}
+th,td{padding:10px 12px;text-align:left;font-size:13px;border-bottom:1px solid var(--border);}
+th{color:var(--text3);font-weight:700;text-transform:uppercase;font-size:11px;letter-spacing:.5px;}
+tr:last-child td{border-bottom:none;}
+.mono{font-family:'JetBrains Mono',monospace;font-size:12px;color:var(--text2);}
+.badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:11px;font-weight:700;}
+.badge.ok{background:rgba(16,185,129,.15);color:var(--success);}
+.badge.banned{background:rgba(239,68,68,.15);color:var(--danger);}
+.btn{border:none;padding:6px 12px;border-radius:8px;font-size:12px;font-weight:700;cursor:pointer;font-family:inherit;margin-right:6px;}
+.btn.ban{background:rgba(245,158,11,.15);color:var(--warn);}
+.btn.unban{background:rgba(16,185,129,.15);color:var(--success);}
+.btn.del{background:rgba(239,68,68,.15);color:var(--danger);}
+.btn:disabled{opacity:.5;cursor:default;}
+.refresh{background:var(--accent);color:#fff;border:none;padding:9px 18px;border-radius:10px;font-weight:700;font-size:13px;cursor:pointer;margin-bottom:16px;font-family:inherit;}
+.wrap{overflow-x:auto;}
+</style>
+</head>
+<body>
+<h1>🛡️ Адмін-панель</h1>
+<div class="sub">TS Розклад — акаунти на сервері</div>
+<div id="root"><div class="state">Завантаження...</div></div>
+
+<script>
+const API='/.netlify/functions/admin';
+
+function authHeaders(){
+  const token=localStorage.getItem('ts_token');
+  return token?{'Authorization':'Bearer '+token}:{};
+}
+
+async function callAdmin(action, extra){
+  const res=await fetch(API,{
+    method:'POST',
+    headers:{'Content-Type':'application/json',...authHeaders()},
+    body:JSON.stringify({action,...extra})
+  });
+  const data=await res.json();
+  if(!res.ok) throw new Error(data.error||'Помилка');
+  return data;
+}
+
+function fmtDate(ts){
+  if(!ts) return '—';
+  return new Date(ts).toLocaleString('uk-UA',{day:'2-digit',month:'2-digit',year:'2-digit',hour:'2-digit',minute:'2-digit'});
+}
+
+async function load(){
+  const root=document.getElementById('root');
+  if(!localStorage.getItem('ts_token')){
+    root.innerHTML='<div class="state err">Спочатку увійди в основному застосунку (index.html) на цьому пристрої.</div>';
+    return;
+  }
+  root.innerHTML='<div class="state">Завантаження...</div>';
+  try{
+    const data=await callAdmin('list-users');
+    render(data.users);
+  }catch(err){
+    root.innerHTML=`<div class="state err">❌ ${escapeHtml(err.message)}</div>`;
+  }
+}
+
+function escapeHtml(s){
+  return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+
+function render(users){
+  const root=document.getElementById('root');
+  if(!users.length){
+    root.innerHTML='<div class="state">Ще немає зареєстрованих акаунтів.</div>';
+    return;
+  }
+  const rows=users.map(u=>`
+    <tr>
+      <td><b>${escapeHtml(u.username)}</b></td>
+      <td class="mono">${escapeHtml(u.email||'—')}</td>
+      <td class="mono">${fmtDate(u.createdAt)}</td>
+      <td class="mono">${fmtDate(u.lastActive)}</td>
+      <td class="mono">${u.subjectsCount} предм. · ${u.notesCount} нотат.</td>
+      <td class="mono">${u.pushSubscriptions}</td>
+      <td>${u.banned?'<span class="badge banned">Заблоковано</span>':'<span class="badge ok">Активний</span>'}</td>
+      <td style="white-space:nowrap">
+        <button class="btn ${u.banned?'unban':'ban'}" onclick="toggleBan('${escapeHtml(u.username)}',${!!u.banned})">${u.banned?'Розблокувати':'Заблокувати'}</button>
+        <button class="btn del" onclick="removeUser('${escapeHtml(u.username)}')">Видалити</button>
+      </td>
+    </tr>`).join('');
+  root.innerHTML=`
+    <button class="refresh" onclick="load()">🔄 Оновити</button>
+    <div class="wrap"><table>
+      <thead><tr>
+        <th>Логін</th><th>Email</th><th>Реєстрація</th><th>Остання активність</th>
+        <th>Дані</th><th>Push</th><th>Статус</th><th></th>
+      </tr></thead>
+      <tbody>${rows}</tbody>
+    </table></div>`;
+}
+
+async function toggleBan(username, isBanned){
+  const action=isBanned?'unban-user':'ban-user';
+  if(!confirm(`${isBanned?'Розблокувати':'Заблокувати'} акаунт "${username}"?`))return;
+  try{
+    await callAdmin(action,{username});
+    load();
+  }catch(err){ alert('❌ '+err.message); }
+}
+
+async function removeUser(username){
+  if(!confirm(`Видалити акаунт "${username}" разом з усіма його даними? Це незворотньо.`))return;
+  try{
+    await callAdmin('delete-user',{username});
+    load();
+  }catch(err){ alert('❌ '+err.message); }
+}
+
+load();
+</script>
+</body>
+</html>

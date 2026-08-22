@@ -487,15 +487,70 @@ button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.t
   <div class="lock-box">
     <span class="lock-ico">🔐</span>
     <div class="lock-title">TS Розклад</div>
-    <div class="lock-sub" id="auth-mode-sub">Увійди у свій акаунт</div>
-    <input class="lock-input" id="auth-username" type="text" placeholder="Логін" maxlength="24" autocomplete="username" autocapitalize="off">
-    <input class="lock-input" id="auth-password" type="password" placeholder="Пароль" maxlength="40" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitAuth()" style="margin-top:8px">
-    <button class="lock-btn" id="auth-submit-btn" onclick="submitAuth()">Увійти</button>
-    <div class="lock-err" id="lock-err"></div>
-    <div style="margin-top:14px;font-size:12px;color:var(--text3)">
-      <span id="auth-toggle-text">Немає акаунту?</span>
-      <a href="javascript:void(0)" onclick="toggleAuthMode()" style="color:var(--accent2);font-weight:700;text-decoration:none" id="auth-toggle-link">Зареєструватися</a>
+
+    <!-- LOGIN -->
+    <div id="auth-view-login" class="auth-view">
+      <div class="lock-sub">Увійди у свій акаунт</div>
+      <input class="lock-input" id="auth-username" type="text" placeholder="Логін" maxlength="24" autocomplete="username" autocapitalize="off">
+      <input class="lock-input" id="auth-password" type="password" placeholder="Пароль" maxlength="40" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitAuth()" style="margin-top:8px">
+      <button class="lock-btn" id="auth-submit-btn" onclick="submitAuth()">Увійти</button>
+      <div class="lock-err" id="lock-err"></div>
+      <div style="margin-top:14px;font-size:12px;color:var(--text3)">
+        <a href="javascript:void(0)" onclick="showAuthView('reg1')" style="color:var(--accent2);font-weight:700;text-decoration:none">Немає акаунту? Зареєструватися</a>
+      </div>
+      <div style="margin-top:8px;font-size:12px;color:var(--text3)">
+        <a href="javascript:void(0)" onclick="showAuthView('forgot1')" style="color:var(--text3);text-decoration:none">Забув пароль?</a>
+      </div>
     </div>
+
+    <!-- REGISTER STEP 1: username/password/email -->
+    <div id="auth-view-reg1" class="auth-view" style="display:none">
+      <div class="lock-sub">Створи новий акаунт</div>
+      <input class="lock-input" id="reg-username" type="text" placeholder="Логін" maxlength="24" autocomplete="username" autocapitalize="off">
+      <input class="lock-input" id="reg-password" type="password" placeholder="Пароль" maxlength="40" autocomplete="new-password" style="margin-top:8px">
+      <input class="lock-input" id="reg-email" type="email" placeholder="Email" autocomplete="email" style="margin-top:8px">
+      <button class="lock-btn" id="reg-submit-btn" onclick="submitRegisterRequest()">Надіслати код на пошту</button>
+      <div class="lock-err" id="reg1-err"></div>
+      <div style="margin-top:14px;font-size:12px;color:var(--text3)">
+        <a href="javascript:void(0)" onclick="showAuthView('login')" style="color:var(--accent2);font-weight:700;text-decoration:none">Вже є акаунт? Увійти</a>
+      </div>
+    </div>
+
+    <!-- REGISTER STEP 2: enter code -->
+    <div id="auth-view-reg2" class="auth-view" style="display:none">
+      <div class="lock-sub">Введи код з листа</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:10px" id="reg2-email-hint"></div>
+      <input class="lock-input" id="reg-code" type="text" inputmode="numeric" placeholder="000000" maxlength="6" onkeydown="if(event.key==='Enter')submitRegisterVerify()">
+      <button class="lock-btn" id="reg2-submit-btn" onclick="submitRegisterVerify()">Підтвердити</button>
+      <div class="lock-err" id="reg2-err"></div>
+      <div style="margin-top:14px;font-size:12px;color:var(--text3)">
+        <a href="javascript:void(0)" onclick="showAuthView('reg1')" style="color:var(--text3);text-decoration:none">← Назад</a>
+      </div>
+    </div>
+
+    <!-- FORGOT STEP 1: enter email -->
+    <div id="auth-view-forgot1" class="auth-view" style="display:none">
+      <div class="lock-sub">Відновлення паролю</div>
+      <input class="lock-input" id="forgot-email" type="email" placeholder="Твій email" autocomplete="email">
+      <button class="lock-btn" id="forgot1-submit-btn" onclick="submitForgotRequest()">Надіслати код</button>
+      <div class="lock-err" id="forgot1-err"></div>
+      <div style="margin-top:14px;font-size:12px;color:var(--text3)">
+        <a href="javascript:void(0)" onclick="showAuthView('login')" style="color:var(--text3);text-decoration:none">← Назад до входу</a>
+      </div>
+    </div>
+
+    <!-- FORGOT STEP 2: code + new password -->
+    <div id="auth-view-forgot2" class="auth-view" style="display:none">
+      <div class="lock-sub">Введи код та новий пароль</div>
+      <input class="lock-input" id="forgot-code" type="text" inputmode="numeric" placeholder="000000" maxlength="6">
+      <input class="lock-input" id="forgot-newpass" type="password" placeholder="Новий пароль" maxlength="40" autocomplete="new-password" style="margin-top:8px" onkeydown="if(event.key==='Enter')submitForgotConfirm()">
+      <button class="lock-btn" id="forgot2-submit-btn" onclick="submitForgotConfirm()">Змінити пароль</button>
+      <div class="lock-err" id="forgot2-err"></div>
+      <div style="margin-top:14px;font-size:12px;color:var(--text3)">
+        <a href="javascript:void(0)" onclick="showAuthView('forgot1')" style="color:var(--text3);text-decoration:none">← Назад</a>
+      </div>
+    </div>
+
   </div>
 </div>
 
@@ -1350,6 +1405,7 @@ function renderCfg(){
   <div class="sec-title">Акаунт</div>
   <div class="sec-card"><div class="sec-row"><div class="sec-ico">${ico('user')}</div><div class="sec-info"><div class="sec-label">Ти увійшов як ${esc(localStorage.getItem('ts_username')||'—')}</div>
     <div class="sec-sub" style="margin-top:2px">Свій розклад бачиш тільки ти, за твоїм акаунтом</div>
+    <button class="savebtn" style="margin-top:9px" onclick="window.open('admin.html','_blank')">${ico('user',16)} Адмін-панель</button>
     <button class="savebtn" style="margin-top:9px;background:var(--danger)" onclick="logoutAccount()">${ico('lock',16)} Вийти з акаунту</button>
   </div></div></div>
   <div class="sec-title">Синхронізація</div>
@@ -1392,15 +1448,24 @@ function exportData(){const blob=new Blob([JSON.stringify({schedule,subjects,cfg
 function importData(e){const file=e.target.files[0];if(!file)return;const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);if(!d.schedule)throw 0;schedule=d.schedule;[5,6].forEach(x=>{if(!schedule[x])schedule[x]=[];});if(d.subjects)subjects=d.subjects;if(d.cfg)cfg={...DEF_CFG,...d.cfg};saveS();saveSubjs();saveCfg();applyTheme();alert('✅ Імпорт успішний!');render();}catch{alert('❌ Невірний файл.');}};r.readAsText(file);e.target.value='';}
 
 // ===== ACCOUNT AUTH =====
-let authMode='login';
-function toggleAuthMode(){
-  authMode=authMode==='login'?'register':'login';
-  document.getElementById('auth-submit-btn').textContent=authMode==='login'?'Увійти':'Зареєструватися';
-  document.getElementById('auth-mode-sub').textContent=authMode==='login'?'Увійди у свій акаунт':'Створи новий акаунт';
-  document.getElementById('auth-toggle-text').textContent=authMode==='login'?'Немає акаунту?':'Вже є акаунт?';
-  document.getElementById('auth-toggle-link').textContent=authMode==='login'?'Зареєструватися':'Увійти';
-  document.getElementById('lock-err').textContent='';
+function showAuthView(view){
+  ['login','reg1','reg2','forgot1','forgot2'].forEach(v=>{
+    const el=document.getElementById('auth-view-'+v);
+    if(el)el.style.display=v===view?'block':'none';
+  });
 }
+
+function onAuthSuccess(data){
+  localStorage.setItem('ts_userid',data.userId);
+  localStorage.setItem('ts_username',data.username);
+  localStorage.setItem('ts_token',data.token);
+  localStorage.setItem('ts_authed','1');
+  document.getElementById('lock-screen').style.display='none';
+  setTimeout(initNotifications,1500);
+  setTimeout(pullFromServer,1500);
+  setTimeout(syncNotifLogFromSW,1500);
+}
+
 async function submitAuth(){
   const username=document.getElementById('auth-username').value.trim();
   const password=document.getElementById('auth-password').value;
@@ -1412,30 +1477,132 @@ async function submitAuth(){
   try{
     const res=await fetch('/.netlify/functions/auth',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({action:authMode,username,password})
+      body:JSON.stringify({username,password})
     });
     const data=await res.json();
     if(!res.ok){
       errEl.textContent='❌ '+(data.error||'Помилка');
-      btn.disabled=false;btn.textContent=authMode==='login'?'Увійти':'Зареєструватися';
+      btn.disabled=false;btn.textContent='Увійти';
       return;
     }
-    localStorage.setItem('ts_userid',data.userId);
-    localStorage.setItem('ts_username',data.username);
-    localStorage.setItem('ts_authed','1');
-    document.getElementById('lock-screen').style.display='none';
-    setTimeout(initNotifications,1500);
-    setTimeout(pullFromServer,1500);
-    setTimeout(syncNotifLogFromSW,1500);
+    onAuthSuccess(data);
   }catch(err){
     errEl.textContent='❌ Проблема з мережею, спробуй ще раз';
-    btn.disabled=false;btn.textContent=authMode==='login'?'Увійти':'Зареєструватися';
+    btn.disabled=false;btn.textContent='Увійти';
   }
 }
+
+let pendingRegEmail='';
+async function submitRegisterRequest(){
+  const username=document.getElementById('reg-username').value.trim();
+  const password=document.getElementById('reg-password').value;
+  const email=document.getElementById('reg-email').value.trim();
+  const errEl=document.getElementById('reg1-err');
+  errEl.textContent='';
+  if(!username||!password||!email){errEl.textContent='❌ Заповни всі поля';return;}
+  const btn=document.getElementById('reg-submit-btn');
+  btn.disabled=true;btn.textContent='Зачекай...';
+  try{
+    const res=await fetch('/.netlify/functions/register',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'request',username,password,email})
+    });
+    const data=await res.json();
+    btn.disabled=false;btn.textContent='Надіслати код на пошту';
+    if(!res.ok){errEl.textContent='❌ '+(data.error||'Помилка');return;}
+    pendingRegEmail=data.email;
+    document.getElementById('reg2-email-hint').textContent='Код надіслано на '+pendingRegEmail;
+    document.getElementById('reg-code').value='';
+    document.getElementById('reg2-err').textContent='';
+    showAuthView('reg2');
+  }catch(err){
+    btn.disabled=false;btn.textContent='Надіслати код на пошту';
+    errEl.textContent='❌ Проблема з мережею, спробуй ще раз';
+  }
+}
+
+async function submitRegisterVerify(){
+  const code=document.getElementById('reg-code').value.trim();
+  const errEl=document.getElementById('reg2-err');
+  errEl.textContent='';
+  if(!code){errEl.textContent='❌ Введи код';return;}
+  const btn=document.getElementById('reg2-submit-btn');
+  btn.disabled=true;btn.textContent='Зачекай...';
+  try{
+    const res=await fetch('/.netlify/functions/register',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'verify',email:pendingRegEmail,code})
+    });
+    const data=await res.json();
+    btn.disabled=false;btn.textContent='Підтвердити';
+    if(!res.ok){errEl.textContent='❌ '+(data.error||'Помилка');return;}
+    onAuthSuccess(data);
+  }catch(err){
+    btn.disabled=false;btn.textContent='Підтвердити';
+    errEl.textContent='❌ Проблема з мережею, спробуй ще раз';
+  }
+}
+
+let pendingForgotEmail='';
+async function submitForgotRequest(){
+  const email=document.getElementById('forgot-email').value.trim();
+  const errEl=document.getElementById('forgot1-err');
+  errEl.textContent='';
+  if(!email){errEl.textContent='❌ Введи email';return;}
+  const btn=document.getElementById('forgot1-submit-btn');
+  btn.disabled=true;btn.textContent='Зачекай...';
+  try{
+    const res=await fetch('/.netlify/functions/reset',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'request',email})
+    });
+    const data=await res.json();
+    btn.disabled=false;btn.textContent='Надіслати код';
+    if(!res.ok){errEl.textContent='❌ '+(data.error||'Помилка');return;}
+    pendingForgotEmail=email;
+    document.getElementById('forgot-code').value='';
+    document.getElementById('forgot-newpass').value='';
+    document.getElementById('forgot2-err').textContent='';
+    showAuthView('forgot2');
+  }catch(err){
+    btn.disabled=false;btn.textContent='Надіслати код';
+    errEl.textContent='❌ Проблема з мережею, спробуй ще раз';
+  }
+}
+
+async function submitForgotConfirm(){
+  const code=document.getElementById('forgot-code').value.trim();
+  const newPassword=document.getElementById('forgot-newpass').value;
+  const errEl=document.getElementById('forgot2-err');
+  errEl.textContent='';
+  if(!code||!newPassword){errEl.textContent='❌ Заповни всі поля';return;}
+  const btn=document.getElementById('forgot2-submit-btn');
+  btn.disabled=true;btn.textContent='Зачекай...';
+  try{
+    const res=await fetch('/.netlify/functions/reset',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({action:'confirm',email:pendingForgotEmail,code,newPassword})
+    });
+    const data=await res.json();
+    btn.disabled=false;btn.textContent='Змінити пароль';
+    if(!res.ok){errEl.textContent='❌ '+(data.error||'Помилка');return;}
+    alert('✅ Пароль змінено! Тепер увійди з новим паролем.');
+    showAuthView('login');
+  }catch(err){
+    btn.disabled=false;btn.textContent='Змінити пароль';
+    errEl.textContent='❌ Проблема з мережею, спробуй ще раз';
+  }
+}
+
 function logoutAccount(){
   if(!confirm('Вийти з акаунту на цьому пристрої?'))return;
+  const token=localStorage.getItem('ts_token');
+  if(token){
+    fetch('/.netlify/functions/logout',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token}}).catch(()=>{});
+  }
   localStorage.removeItem('ts_userid');
   localStorage.removeItem('ts_username');
+  localStorage.removeItem('ts_token');
   localStorage.removeItem('ts_authed');
   location.reload();
 }
@@ -1465,21 +1632,30 @@ function urlB64ToUint8Array(base64String){
 let pushStatus='unknown'; // unknown | subscribed | unsupported | denied | error
 
 async function initNotifications(silent=false){
-  if(!('Notification' in window)||!navigator.serviceWorker){pushStatus='unsupported';return;}
+  if(!('Notification' in window)||!navigator.serviceWorker){pushStatus='unsupported';sendScheduleToSW();return;}
   let perm=Notification.permission;
   if(perm==='default') perm=await Notification.requestPermission();
   if(perm==='granted'){
-    sendScheduleToSW();
+    // Subscribe FIRST, then tell the SW about the schedule — sendScheduleToSW
+    // reads the now-current pushStatus so the local ticker only starts as a
+    // fallback when push actually failed, instead of always racing it.
     await subscribeToPush();
+    sendScheduleToSW();
     queueServerSync(true);
     if(!silent) addNotif('✅ Сповіщення увімкнено','Push активовано — прийде навіть якщо застосунок закритий');
     updateBellBadge();
   } else {
     pushStatus='denied';
+    sendScheduleToSW();
     if(!silent) addNotif('❌ Сповіщення заблоковані','Дозволь їх у налаштуваннях браузера (🔒 → Дозволи)','warn');
     updateBellBadge();
   }
   renderPushStatus();
+}
+
+function authHeaders(){
+  const token=localStorage.getItem('ts_token');
+  return token?{'Authorization':'Bearer '+token}:{};
 }
 
 async function subscribeToPush(){
@@ -1494,8 +1670,8 @@ async function subscribeToPush(){
       });
     }
     await fetch('/.netlify/functions/save-subscription',{
-      method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({userId:localStorage.getItem('ts_userid'),subscription:sub})
+      method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},
+      body:JSON.stringify({subscription:sub})
     });
     pushStatus='subscribed';
   }catch(err){
@@ -1506,24 +1682,25 @@ async function subscribeToPush(){
 }
 
 let syncTimer=null;
+let pendingSyncAfterPull=false;
 function queueServerSync(immediate=false){
-  if(applyingRemote)return;
-  const userId=localStorage.getItem('ts_userid');
-  if(!userId)return;
+  if(applyingRemote){pendingSyncAfterPull=true;return;}
+  const token=localStorage.getItem('ts_token');
+  if(!token)return;
   if(syncTimer)clearTimeout(syncTimer);
   const run=()=>fetch('/.netlify/functions/save-schedule',{
-    method:'POST',headers:{'Content-Type':'application/json'},
-    body:JSON.stringify({userId,schedule,subjects,cfg,notes})
+    method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},
+    body:JSON.stringify({schedule,subjects,cfg,notes})
   }).then(()=>{lastSyncedTs=Date.now();localStorage.setItem('ts_sync_ts',String(lastSyncedTs));})
     .catch(err=>console.error('Server sync failed',err));
   if(immediate)run();else syncTimer=setTimeout(run,1500);
 }
 
 async function pullFromServer(){
-  const userId=localStorage.getItem('ts_userid');
-  if(!userId)return;
+  const token=localStorage.getItem('ts_token');
+  if(!token)return;
   try{
-    const res=await fetch('/.netlify/functions/load-schedule?userId='+encodeURIComponent(userId));
+    const res=await fetch('/.netlify/functions/load-schedule',{headers:authHeaders()});
     if(!res.ok)return;
     const data=await res.json();
     if(!data||!data.updatedAt)return;
@@ -1546,6 +1723,13 @@ async function pullFromServer(){
   }catch(err){
     console.error('Pull sync failed',err);
     applyingRemote=false;
+  }
+  // A local edit that happened while a pull was in flight gets swallowed by
+  // queueServerSync's applyingRemote guard above — replay it now instead of
+  // silently losing that change.
+  if(pendingSyncAfterPull){
+    pendingSyncAfterPull=false;
+    queueServerSync();
   }
 }
 
@@ -1570,7 +1754,9 @@ function sendScheduleToSW(){
     const s=getSubj(sl.subjId);
     return{time:sl.time,name:s.name,teacher:s.teacher||'',notif10:cfg.notif10!==false,notif5:cfg.notif5!==false};
   });
-  navigator.serviceWorker.controller.postMessage({type:'SCHEDULE',slots});
+  // pushActive tells the SW whether real web push already covers these
+  // reminders, so its local ticker fallback doesn't fire duplicates.
+  navigator.serviceWorker.controller.postMessage({type:'SCHEDULE',slots,pushActive:pushStatus==='subscribed'});
 }
 
 // Listen for messages from SW (when notification actually fires)
