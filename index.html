@@ -460,7 +460,15 @@ button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.t
 #account-block-overlay{position:fixed;inset:0;z-index:20000;background:rgba(0,0,0,.82);backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;padding:20px;}
 #account-block-box{max-width:430px;width:100%;padding:26px;border-radius:20px;background:var(--bg2);border:1px solid var(--border2);box-shadow:var(--shadow);text-align:center;}
 #account-block-box .bt{font-size:22px;font-weight:900;margin-bottom:8px}.account-block-msg{color:var(--text2);line-height:1.5;font-size:13px}
-.mail-notice{padding:11px 12px;margin:10px 0 12px;border:1px solid rgba(96,165,250,.25);background:rgba(37,99,235,.10);border-radius:11px;color:var(--text2);font-size:11px;line-height:1.45}.mail-notice b{color:var(--accent2)}</style>
+.mail-notice{padding:11px 12px;margin:10px 0 12px;border:1px solid rgba(96,165,250,.25);background:rgba(37,99,235,.10);border-radius:11px;color:var(--text2);font-size:11px;line-height:1.45}.mail-notice b{color:var(--accent2)}<style>
+.ban-modal{position:fixed;inset:0;z-index:21000;background:rgba(0,0,0,.78);backdrop-filter:blur(12px);display:none;align-items:center;justify-content:center;padding:18px}
+.ban-card{width:min(470px,100%);background:var(--bg2);border-radius:22px;padding:24px;box-shadow:0 24px 90px rgba(0,0,0,.55)}
+.ban-card.account{border:1px solid rgba(239,68,68,.7);box-shadow:0 0 35px rgba(239,68,68,.2),0 24px 90px rgba(0,0,0,.55)}
+.ban-card.ip{border:1px solid rgba(245,158,11,.75);box-shadow:0 0 35px rgba(245,158,11,.2),0 24px 90px rgba(0,0,0,.55)}
+.ban-icon{font-size:38px}.ban-title{font-size:23px;font-weight:900;margin:6px 0}.account .ban-title{color:#f87171}.ip .ban-title{color:#fbbf24}
+.ban-project{color:var(--text2);font-size:13px;line-height:1.55}.ban-section{margin-top:14px;padding:12px;border-radius:12px;background:var(--bg3);border:1px solid var(--border);font-size:12px}.ban-label{font-size:10px;color:var(--text3);font-weight:900;text-transform:uppercase;margin-bottom:4px}.ban-value{white-space:pre-wrap;overflow-wrap:anywhere}.ban-timer{font-family:monospace;font-weight:800;margin-top:5px}
+</style>
+</style>
 </head>
 <body>
 
@@ -604,7 +612,13 @@ button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.t
     <button class="lock-btn" style="margin-top:18px" onclick="forceLocalLogout()">Вийти</button>
   </div>
 </div>
-<!-- HEADER -->
+<div id="ban-modal" class="ban-modal"><div id="ban-card" class="ban-card account">
+<div class="ban-icon" id="ban-icon">🔒</div><div class="ban-title" id="ban-title">АКАУНТ ЗАБЛОКОВАНО</div>
+<div class="ban-project">Адміністрація проекту <b>TS_Daily</b> повідомляє:</div>
+<div class="ban-section"><div class="ban-label">Причина блокування</div><div class="ban-value" id="ban-reason"></div></div>
+<div class="ban-section"><div class="ban-label">Термін блокування</div><div class="ban-value" id="ban-until"></div><div class="ban-timer" id="ban-timer"></div></div>
+<div class="ban-project" style="margin-top:13px">Якщо ви вважаєте блокування помилковим, зверніться до адміністрації проекту.</div>
+<div style="text-align:right;margin-top:16px"><button class="lock-btn" onclick="closeBanModal()">Закрити</button></div></div></div><!-- HEADER -->
 <div class="header">
   <div class="header-top">
     <div class="logo-area">
@@ -1765,6 +1779,18 @@ async function checkAdminRole(){
 }
 
 
+let banTimerId=null,banEndsAt=0;
+function showBanModal(type,d){
+ const c=document.getElementById('ban-card'),ip=type==='ip'; c.className='ban-card '+(ip?'ip':'account');
+ document.getElementById('ban-icon').textContent=ip?'🚫':'🔒';
+ document.getElementById('ban-title').textContent=ip?'ДОСТУП ЗАБЛОКОВАНО':'АКАУНТ ЗАБЛОКОВАНО';
+ document.getElementById('ban-reason').textContent=d.reason||(ip?'Доступ із цієї IP-адреси обмежено адміністратором.':'Доступ до цього акаунта обмежено адміністратором.');
+ banEndsAt=Number(d.expiresAt||0); document.getElementById('ban-until').textContent=banEndsAt?'До '+new Date(banEndsAt).toLocaleString('uk-UA'):'Назавжди';
+ clearInterval(banTimerId); updateBanTimer(); if(banEndsAt)banTimerId=setInterval(updateBanTimer,1000);
+ document.getElementById('ban-modal').style.display='flex';
+}
+function updateBanTimer(){const e=document.getElementById('ban-timer');if(!e)return;if(!banEndsAt){e.textContent='';return}const x=Math.max(0,Math.floor((banEndsAt-Date.now())/1000));if(!x){e.textContent='Термін блокування завершено';clearInterval(banTimerId);return}const d=Math.floor(x/86400),h=Math.floor(x%86400/3600),m=Math.floor(x%3600/60),s=x%60;e.textContent=`⏱️ До розблокування: ${d?d+' д ':''}${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`}
+function closeBanModal(){document.getElementById('ban-modal').style.display='none';clearInterval(banTimerId)}
 function forceLocalLogout(){
   localStorage.removeItem('ts_userid');localStorage.removeItem('ts_username');localStorage.removeItem('ts_token');
   localStorage.removeItem('ts_authed');localStorage.removeItem('ts_email');localStorage.removeItem('ts_is_admin');
@@ -1786,11 +1812,11 @@ async function checkSessionStatus(){
     const res=await fetch('/.netlify/functions/session-status',{headers:{'Authorization':'Bearer '+token}});
     const data=await res.json().catch(()=>({}));
     if(res.status===403 && data.banned){
-      showAccountBlocked('Доступ до цього акаунта обмежено адміністратором.');
+      showBanModal('account',{reason:data.banReason,expiresAt:data.banExpiresAt});
       return;
     }
     if(res.status===403 && data.ipBlocked){
-      showAccountBlocked('Цей IP-адрес заблоковано адміністратором.','🚫 IP-адресу заблоковано');
+      showBanModal('ip',{reason:data.ipBanReason,expiresAt:data.ipBanExpiresAt});
       return;
     }
     if(res.status===401){
