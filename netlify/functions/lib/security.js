@@ -66,8 +66,27 @@ async function rateLimit(s, key, limit, windowMs) {
   return { allowed: true, retryAfter: 0 };
 }
 
+function hashCode(code) {
+  return crypto.createHash('sha256').update(String(code)).digest();
+}
+
+function safeCodeEqual(code, expectedHashHex) {
+  try {
+    const a = hashCode(code);
+    const b = Buffer.from(String(expectedHashHex || ''), 'hex');
+    return a.length === b.length && crypto.timingSafeEqual(a, b);
+  } catch {
+    return false;
+  }
+}
+
+async function protectCodeAttempt(s, namespace, subject, ip, limit = 5, windowMs = 15 * 60 * 1000) {
+  const key = `${namespace}:${String(subject).slice(0, 160)}:${String(ip).slice(0, 160)}`;
+  return rateLimit(s, key, limit, windowMs);
+}
+
 function hashIpForLog(ip) {
   return crypto.createHash('sha256').update(String(ip)).digest('hex').slice(0, 16);
 }
 
-module.exports = { getClientIp, getUserAgent, parseDevice, isIpBanned, enforceIpBan, rateLimit, hashIpForLog };
+module.exports = { getClientIp, getUserAgent, parseDevice, isIpBanned, enforceIpBan, rateLimit, protectCodeAttempt, hashCode, safeCodeEqual, hashIpForLog };
