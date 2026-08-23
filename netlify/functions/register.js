@@ -27,8 +27,8 @@ exports.handler = async (event) => {
 
     // ---- Step 1: validate input, stash a pending registration, email a code ----
     if (action === 'request') {
-      const { username, password, email } = body;
-      if (!username || !password || !email) {
+      const { username, password, confirmPassword, email } = body;
+      if (!username || !password || !email || !confirmPassword) {
         return { statusCode: 400, body: JSON.stringify({ error: 'Заповни всі поля' }) };
       }
       const uname = String(username).trim().toLowerCase();
@@ -36,6 +36,9 @@ exports.handler = async (event) => {
 
       if (uname.length < 3 || !/^[a-z0-9_.]+$/.test(uname)) {
         return { statusCode: 400, body: JSON.stringify({ error: 'Логін: мінімум 3 символи, лише латиниця/цифри/_/.' }) };
+      }
+      if (String(password) !== String(confirmPassword)) {
+        return { statusCode: 400, body: JSON.stringify({ error: 'Паролі не збігаються' }) };
       }
       if (String(password).length < 8 || String(password).length > 128) {
         return { statusCode: 400, body: JSON.stringify({ error: 'Пароль має містити від 8 до 128 символів' }) };

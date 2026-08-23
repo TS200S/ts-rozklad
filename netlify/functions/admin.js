@@ -67,6 +67,15 @@ exports.handler = async (event) => {
       for (const b of blobs) {
         const u = await s.get(b.key, { type: 'json' }).catch(() => null);
         if (!u) continue;
+        if (u.banned && Number(u.banExpiresAt || 0) && Number(u.banExpiresAt) <= Date.now()) {
+          u.banned = false; u.bannedAt = null; u.banReason = null; u.banExpiresAt = 0;
+          await s.setJSON(`user:${u.username}`, u).catch(() => {});
+          const { blobs: revoked } = await s.list({ prefix: 'revoked-ban:' }).catch(() => ({blobs:[]}));
+          for (const rb of revoked) {
+            const mark = await s.get(rb.key,{type:'json'}).catch(()=>null);
+            if (mark?.username === u.username) await s.delete(rb.key).catch(()=>{});
+          }
+        }
         const sessions = await listSessionsForUser(s, u.userId);
         const schedData = await s.get(`schedule-data:${u.userId}`, { type: 'json' }).catch(() => null);
         const subs = (await s.get(`subscriptions:${u.userId}`, { type: 'json' }).catch(() => null)) || [];
