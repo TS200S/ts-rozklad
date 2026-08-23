@@ -2,14 +2,13 @@ const crypto = require('crypto');
 const { store } = require('./lib/store');
 const { validateSession, extractToken } = require('./lib/session');
 const { sendCodeEmail } = require('./lib/mailer');
-const { enforceIpBan, getClientIp, rateLimit } = require('./lib/security');
+const { enforceIpBan, getClientIp, rateLimit, protectCodeAttempt, safeCodeEqual, hashCode } = require('./lib/security');
+const { recordActivity } = require('./lib/activity');
 
 const CODE_TTL_MS = 15 * 60 * 1000;
 const MAX_CODE_ATTEMPTS = 5;
 
-function genCode() {
-  return String(Math.floor(100000 + Math.random() * 900000));
-}
+function genCode() { return String(crypto.randomInt(100000, 1000000)); }
 
 function json(statusCode, body) {
   return {
@@ -21,7 +20,7 @@ function json(statusCode, body) {
 
 async function getSessionUser(event, s) {
   const token = extractToken(event);
-  const sess = await validateSession(s, token);
+  const sess = await validateSession(s, token, event);
   if (!sess) return null;
   return await s.get(`user:${sess.username}`, { type: 'json' }).catch(() => null);
 }
@@ -61,11 +60,12 @@ exports.handler = async (event) => {
       }
 
       const code = genCode();
+      await recordActivity(s, user.userId, 'email-change-request', { ip: getClientIp(event), email: mail });
       await s.setJSON(`pending-email:${user.username}`, {
         userId: user.userId,
         username: user.username,
         email: mail,
-        code,
+        codeHash: hashCode(code).toString('hex'),
         expiresAt: Date.now() + CODE_TTL_MS,
         attempts: 0
       });
@@ -106,7 +106,9 @@ exports.handler = async (event) => {
         return json(429, { error: 'Забагато спроб. Запроси код ще раз.' });
       }
 
-      if (code !== pending.code) {
+      const globalRl = await protectCodeAttempt(s, 'email-change-verify', user.userId, getClientIp(event), 8, 15 * 60 * 1000);
+      if (!globalRl.allowed) return json(429, { error: `Забагато спроб. Спробуй через ${globalRl.retryAfter} с.` });
+      if (!safeCodeEqual(code, pending.codeHash)) {
         pending.attempts = (pending.attempts || 0) + 1;
         await s.setJSON(`pending-email:${user.username}`, pending);
         return json(400, { error: 'Невірний код' });
@@ -128,6 +130,7 @@ exports.handler = async (event) => {
       user.lastActive = Date.now();
 
       await s.setJSON(`user:${user.username}`, user);
+      await recordActivity(s, user.userId, 'email-changed', { ip: getClientIp(event), email: user.email });
       await s.setJSON(`email:${pending.email}`, { username: user.username });
       await s.delete(`pending-email:${user.username}`).catch(() => {});
 

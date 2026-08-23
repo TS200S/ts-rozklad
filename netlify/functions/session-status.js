@@ -20,7 +20,7 @@ exports.handler = async (event) => {
     const token=extractToken(event);
     if(!token) return json(401,{error:'Сесія недійсна',sessionExpired:true});
 
-    const sess=await validateSession(s,token);
+    const sess=await validateSession(s,token,event);
     if(sess?.banned){
       const exp=Number(sess.banExpiresAt||0);
       if(exp && exp<=Date.now()){

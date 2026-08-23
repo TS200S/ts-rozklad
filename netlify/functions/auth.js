@@ -1,7 +1,9 @@
 const crypto = require('crypto');
 const { store } = require('./lib/store');
-const { createSession, sessionMeta } = require('./lib/session');
-const { enforceIpBan, getClientIp, rateLimit } = require('./lib/security');
+const { createSession, sessionMeta, sessionCookie } = require('./lib/session');
+const { enforceIpBan, getClientIp, rateLimit, hashCode } = require('./lib/security');
+const { sendLoginCodeEmail, sendNewDeviceAlertEmail } = require('./lib/mailer');
+const { recordActivity } = require('./lib/activity');
 
 function hashPassword(password, salt) {
   return crypto.scryptSync(password, salt, 64).toString('hex');
@@ -17,7 +19,7 @@ exports.handler = async (event) => {
 
   try {
     const body = JSON.parse(event.body || '{}');
-    const { username, password } = body;
+    const { username, password, deviceId = '' } = body;
 
     if (!username || !password) {
       return { statusCode: 400, body: JSON.stringify({ error: 'Потрібні логін і пароль' }) };
@@ -71,6 +73,7 @@ exports.handler = async (event) => {
     const b = Buffer.from(String(user.hash || ''), 'hex');
     const validHash = a.length === b.length && crypto.timingSafeEqual(a, b);
     if (!validHash) {
+      await recordActivity(s, user.userId, 'login-failed', { ip, device: require('./lib/security').parseDevice(require('./lib/security').getUserAgent(event)), reason: 'invalid-password' });
       const newCount = (attempts.count || 0) + 1;
       const newAttempts = { count: newCount, lockedUntil: 0 };
       if (newCount >= MAX_ATTEMPTS) {
@@ -84,14 +87,44 @@ exports.handler = async (event) => {
     await s.delete(attemptsKey).catch(() => {});
 
     user.lastActive = Date.now();
-    await s.setJSON(userKey, user);
+    const meta = sessionMeta(event);
+    meta.deviceId = String(deviceId || '').slice(0, 128);
+    const trusted = Array.isArray(user.trustedDeviceIds) ? user.trustedDeviceIds : [];
+    const isNewDevice = !!meta.deviceId && !trusted.includes(meta.deviceId);
+    const requireEmail = user.security?.requireEveryLoginEmail === true || (isNewDevice && user.security?.requireNewDeviceEmail === true);
 
-    const { token, expiresAt } = await createSession(s, user.userId, user.username, sessionMeta(event));
+    if (requireEmail) {
+      if (!user.email || user.emailVerified !== true) return { statusCode: 403, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ error: 'Для додаткового захисту підтверди email у налаштуваннях акаунта' }) };
+      const challengeId = crypto.randomBytes(24).toString('hex');
+      const code = String(crypto.randomInt(100000, 1000000));
+      await s.setJSON(`pending-login:${challengeId}`, { username: user.username, userId: user.userId, codeHash: hashCode(code).toString('hex'), deviceId: meta.deviceId, meta, createdAt: Date.now(), expiresAt: Date.now() + 15 * 60 * 1000, attempts: 0 });
+      try {
+        const rl = await rateLimit(s, `login-code-send:${user.email}`, 3, 15 * 60 * 1000);
+        if (!rl.allowed) return { statusCode: 429, body: JSON.stringify({ error: 'Забагато кодів підтвердження. Спробуй пізніше.' }) };
+        await sendLoginCodeEmail(user.email, code);
+      } catch {
+        await s.delete(`pending-login:${challengeId}`).catch(() => {});
+        return { statusCode: 500, body: JSON.stringify({ error: 'Не вдалося надіслати код на email. Спробуй пізніше.' }) };
+      }
+      await recordActivity(s, user.userId, 'login-challenge', { ip, device: meta.device, newDevice: isNewDevice });
+      return { statusCode: 202, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ requiresEmailVerification: true, challengeId, email: user.email }) };
+    }
+
+    if (meta.deviceId && !trusted.includes(meta.deviceId)) {
+      trusted.push(meta.deviceId);
+      user.trustedDeviceIds = trusted.slice(-50);
+    }
+    await s.setJSON(userKey, user);
+    const { token, expiresAt } = await createSession(s, user.userId, user.username, meta);
+    if (isNewDevice && user.security?.newDeviceEmail !== false && user.email && user.emailVerified === true) {
+      sendNewDeviceAlertEmail(user.email, { ip: meta.ip, device: `${meta.device.type} · ${meta.device.os} · ${meta.device.browser}`, at: Date.now() }).catch(() => {});
+      await recordActivity(s, user.userId, 'new-device-email', { ip: meta.ip, device: meta.device });
+    }
 
     return {
       statusCode: 200,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ok: true, userId: user.userId, username: user.username, email: user.email || null, emailVerified: user.emailVerified === true, role: (user.role === 'admin' || String(user.username).toLowerCase() === String(process.env.ADMIN_USERNAME || '').trim().toLowerCase()) ? 'admin' : 'user', token, expiresAt })
+      headers: { 'Content-Type': 'application/json', 'Set-Cookie': sessionCookie(token) },
+      body: JSON.stringify({ ok: true, userId: user.userId, username: user.username, email: user.email || null, emailVerified: user.emailVerified === true, role: (user.role === 'admin' || String(user.username).toLowerCase() === String(process.env.ADMIN_USERNAME || '').trim().toLowerCase()) ? 'admin' : 'user', expiresAt })
     };
   } catch (err) {
     return { statusCode: 500, body: JSON.stringify({ error: String(err) }) };

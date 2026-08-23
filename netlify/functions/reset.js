@@ -2,14 +2,13 @@ const crypto = require('crypto');
 const { store } = require('./lib/store');
 const { deleteAllSessionsForUser } = require('./lib/session');
 const { sendCodeEmail } = require('./lib/mailer');
-const { enforceIpBan, getClientIp, rateLimit } = require('./lib/security');
+const { enforceIpBan, getClientIp, rateLimit, protectCodeAttempt, safeCodeEqual, hashCode } = require('./lib/security');
+const { recordActivity } = require('./lib/activity');
 
 function hashPassword(password, salt) {
   return crypto.scryptSync(password, salt, 64).toString('hex');
 }
-function genCode() {
-  return String(Math.floor(100000 + Math.random() * 900000));
-}
+function genCode() { return String(crypto.randomInt(100000, 1000000)); }
 const CODE_TTL_MS = 15 * 60 * 1000;
 const MAX_CODE_ATTEMPTS = 5;
 
@@ -45,8 +44,9 @@ exports.handler = async (event) => {
       if (!user || user.banned) return generic;
 
       const code = genCode();
+      await recordActivity(s, user.userId, 'password-reset-request', { ip, email: mail });
       await s.setJSON(`pending-reset:${mail}`, {
-        userId: user.userId, username: user.username, code,
+        userId: user.userId, username: user.username, codeHash: hashCode(code).toString('hex'),
         expiresAt: Date.now() + CODE_TTL_MS, attempts: 0
       });
 
@@ -87,7 +87,9 @@ exports.handler = async (event) => {
         await s.delete(`pending-reset:${mail}`).catch(() => {});
         return { statusCode: 429, body: JSON.stringify({ error: 'Забагато спроб, запроси код ще раз' }) };
       }
-      if (String(code).trim() !== pending.code) {
+      const globalRl = await protectCodeAttempt(s, 'password-reset-verify', pending.userId || mail, ip, 8, 15 * 60 * 1000);
+      if (!globalRl.allowed) return { statusCode: 429, body: JSON.stringify({ error: `Забагато спроб. Спробуй через ${globalRl.retryAfter} с.` }) };
+      if (!safeCodeEqual(String(code).trim(), pending.codeHash)) {
         pending.attempts = (pending.attempts || 0) + 1;
         await s.setJSON(`pending-reset:${mail}`, pending);
         return { statusCode: 400, body: JSON.stringify({ error: 'Невірний код' }) };
@@ -101,7 +103,10 @@ exports.handler = async (event) => {
       const hash = hashPassword(newPassword, salt);
       user.salt = salt;
       user.hash = hash;
+      user.passwordChangedAt = Date.now();
+    user.trustedDeviceIds = [];
       await s.setJSON(`user:${pending.username}`, user);
+      await recordActivity(s, user.userId, 'password-reset-completed', { ip: getClientIp(event), email: mail });
       await s.delete(`pending-reset:${mail}`).catch(() => {});
 
       // A password reset means any device/session using the old password

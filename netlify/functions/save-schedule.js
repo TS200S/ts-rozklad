@@ -11,7 +11,7 @@ exports.handler = async (event) => {
     const s = store();
     const ipBan = await enforceIpBan(s, event);
     if (ipBan) return { statusCode: 403, body: JSON.stringify({ error: 'Цей IP-адрес заблоковано', ipBlocked: true }) };
-    const sess = await validateSession(s, extractToken(event));
+    const sess = await validateSession(s, extractToken(event), event);
     if (!sess) {
       return { statusCode: 401, body: JSON.stringify({ error: 'Сесія недійсна, увійди ще раз' }) };
     }

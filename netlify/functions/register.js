@@ -1,15 +1,14 @@
 const crypto = require('crypto');
 const { store } = require('./lib/store');
-const { createSession, sessionMeta } = require('./lib/session');
+const { createSession, sessionMeta, sessionCookie } = require('./lib/session');
 const { sendCodeEmail } = require('./lib/mailer');
-const { enforceIpBan, getClientIp, rateLimit } = require('./lib/security');
+const { enforceIpBan, getClientIp, rateLimit, protectCodeAttempt, safeCodeEqual, hashCode } = require('./lib/security');
+const { recordActivity } = require('./lib/activity');
 
 function hashPassword(password, salt) {
   return crypto.scryptSync(password, salt, 64).toString('hex');
 }
-function genCode() {
-  return String(Math.floor(100000 + Math.random() * 900000));
-}
+function genCode() { return String(crypto.randomInt(100000, 1000000)); }
 const CODE_TTL_MS = 15 * 60 * 1000;
 const MAX_CODE_ATTEMPTS = 5;
 
@@ -66,7 +65,7 @@ exports.handler = async (event) => {
       const code = genCode();
 
       await s.setJSON(`pending-reg:${mail}`, {
-        username: uname, salt, hash, code,
+        username: uname, salt, hash, codeHash: hashCode(code).toString('hex'),
         expiresAt: Date.now() + CODE_TTL_MS,
         attempts: 0
       });
@@ -90,7 +89,7 @@ exports.handler = async (event) => {
 
     // ---- Step 2: check the code, create the account, log the user in ----
     if (action === 'verify') {
-      const { email, code } = body;
+      const { email, code, deviceId = '' } = body;
       if (!email || !code) {
         return { statusCode: 400, body: JSON.stringify({ error: 'Потрібен email і код' }) };
       }
@@ -107,7 +106,9 @@ exports.handler = async (event) => {
         await s.delete(`pending-reg:${mail}`).catch(() => {});
         return { statusCode: 429, body: JSON.stringify({ error: 'Забагато невірних спроб, зареєструйся ще раз' }) };
       }
-      if (String(code).trim() !== pending.code) {
+      const globalRl = await protectCodeAttempt(s, 'register-verify', pending.username || mail, ip, 8, 15 * 60 * 1000);
+      if (!globalRl.allowed) return { statusCode: 429, body: JSON.stringify({ error: `Забагато спроб. Спробуй через ${globalRl.retryAfter} с.` }) };
+      if (!safeCodeEqual(String(code).trim(), pending.codeHash)) {
         pending.attempts = (pending.attempts || 0) + 1;
         await s.setJSON(`pending-reg:${mail}`, pending);
         return { statusCode: 400, body: JSON.stringify({ error: 'Невірний код' }) };
@@ -125,18 +126,22 @@ exports.handler = async (event) => {
       const userRecord = {
         userId, username: pending.username, email: mail, emailVerified: true,
         salt: pending.salt, hash: pending.hash,
-        createdAt: Date.now(), lastActive: Date.now()
+        createdAt: Date.now(), lastActive: Date.now(), security: { newDeviceEmail: true, requireNewDeviceEmail: false, requireEveryLoginEmail: false }, trustedDeviceIds: []
       };
       await s.setJSON(`user:${pending.username}`, userRecord);
       await s.setJSON(`email:${mail}`, { username: pending.username });
       await s.delete(`pending-reg:${mail}`).catch(() => {});
 
-      const { token, expiresAt } = await createSession(s, userId, pending.username, sessionMeta(event));
+      const meta = sessionMeta(event);
+      const registrationDeviceId = String(deviceId || '').slice(0, 128);
+      meta.deviceId = registrationDeviceId;
+      const { token, expiresAt } = await createSession(s, userId, pending.username, meta);
+      if (registrationDeviceId) { userRecord.trustedDeviceIds = [registrationDeviceId]; await s.setJSON(`user:${pending.username}`, userRecord); }
+      await recordActivity(s, userId, 'account-created', { ip, device: meta.device });
 
       return {
         statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ok: true, userId, username: pending.username, token, expiresAt })
+        headers: { 'Content-Type': 'application/json', 'Set-Cookie': sessionCookie(token) }, body: JSON.stringify({ ok: true, userId, username: pending.username, expiresAt })
       };
     }
 
