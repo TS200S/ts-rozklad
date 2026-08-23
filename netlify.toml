@@ -7,3 +7,9 @@
   [headers.values]
     Cache-Control = "no-cache"
     Service-Worker-Allowed = "/"
+
+[functions."cleanup-bans"]
+  schedule = "* * * * *"
+
+[functions."scheduled-notifications"]
+  schedule = "* * * * *"

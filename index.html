@@ -467,7 +467,18 @@ button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.t
 .ban-card.account{border:1px solid rgba(239,68,68,.78);box-shadow:0 0 0 1px rgba(239,68,68,.12),0 0 45px rgba(239,68,68,.25),0 24px 90px rgba(0,0,0,.65)}
 .ban-card.ip{border:1px solid rgba(245,158,11,.82);box-shadow:0 0 0 1px rgba(245,158,11,.12),0 0 45px rgba(245,158,11,.25),0 24px 90px rgba(0,0,0,.65)}
 .ban-icon{font-size:40px}.ban-title{font-size:23px;font-weight:900;margin:7px 0}.account .ban-title{color:#f87171}.ip .ban-title{color:#fbbf24}
-.ban-project{color:var(--text2);font-size:13px;line-height:1.55}.ban-section{margin-top:15px;padding:13px;border-radius:13px;background:var(--bg3);border:1px solid var(--border);font-size:12px;line-height:1.5}.ban-label{font-size:10px;color:var(--text3);font-weight:900;text-transform:uppercase;letter-spacing:.55px;margin-bottom:5px}.ban-value{white-space:pre-wrap;overflow-wrap:anywhere}.ban-timer{font-family:monospace;font-weight:800;margin-top:6px}</style>
+.ban-project{color:var(--text2);font-size:13px;line-height:1.55}.ban-section{margin-top:15px;padding:13px;border-radius:13px;background:var(--bg3);border:1px solid var(--border);font-size:12px;line-height:1.5}.ban-label{font-size:10px;color:var(--text3);font-weight:900;text-transform:uppercase;letter-spacing:.55px;margin-bottom:5px}.ban-value{white-space:pre-wrap;overflow-wrap:anywhere}.ban-timer{font-family:monospace;font-weight:800;margin-top:6px}
+/* v5 polish */
+.pass-wrap{position:relative;margin-top:8px}
+.pass-wrap .lock-input{margin-top:0!important;padding-right:46px}
+.pass-eye{position:absolute;right:8px;top:50%;transform:translateY(-50%);width:34px;height:34px;border:0;background:transparent;color:var(--text3);cursor:pointer;border-radius:9px;display:flex;align-items:center;justify-content:center}
+.pass-eye:hover{background:var(--bg3);color:var(--text)}
+.bell-wrap{position:relative;width:30px;height:30px;display:flex;align-items:center;justify-content:center}
+#bell-badge{top:-4px!important;right:-5px!important;min-width:18px!important;width:auto!important;height:18px!important;line-height:18px!important;padding:0 5px!important;border:2px solid var(--bg2);box-sizing:border-box;display:none;align-items:center;justify-content:center;box-shadow:0 3px 10px rgba(0,0,0,.35);font-size:9px!important}
+.note-reminder{animation:notePulse 1.6s ease-in-out infinite}
+@keyframes notePulse{0%,100%{box-shadow:0 0 0 rgba(245,158,11,0)}50%{box-shadow:0 0 18px rgba(245,158,11,.16)}}
+
+</style>
 </head>
 <body>
 
@@ -516,7 +527,7 @@ button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.t
     <div id="auth-view-login" class="auth-view">
       <div class="lock-sub">Увійди у свій акаунт</div>
       <input class="lock-input" id="auth-username" type="text" placeholder="Логін" maxlength="24" autocomplete="username" autocapitalize="off">
-      <input class="lock-input" id="auth-password" type="password" placeholder="Пароль" maxlength="40" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitAuth()" style="margin-top:8px">
+      <div class="pass-wrap"><input class="lock-input" id="auth-password" type="password" placeholder="Пароль" maxlength="40" autocomplete="current-password" onkeydown="if(event.key==='Enter')submitAuth()"><button type="button" class="pass-eye" onclick="togglePassword('auth-password',this)" aria-label="Показати пароль"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
       <button class="lock-btn" id="auth-submit-btn" onclick="submitAuth()">Увійти</button>
       <div class="lock-err" id="lock-err"></div>
       <div style="margin-top:14px;font-size:12px;color:var(--text3)">
@@ -531,7 +542,8 @@ button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.t
     <div id="auth-view-reg1" class="auth-view" style="display:none">
       <div class="lock-sub">Створи новий акаунт</div>
       <input class="lock-input" id="reg-username" type="text" placeholder="Логін" maxlength="24" autocomplete="username" autocapitalize="off">
-      <input class="lock-input" id="reg-password" type="password" placeholder="Пароль" maxlength="40" autocomplete="new-password" style="margin-top:8px">
+      <div class="pass-wrap"><input class="lock-input" id="reg-password" type="password" placeholder="Пароль" maxlength="40" autocomplete="new-password"><button type="button" class="pass-eye" onclick="togglePassword('reg-password',this)" aria-label="Показати пароль"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+      <div class="pass-wrap"><input class="lock-input" id="reg-password-confirm" type="password" placeholder="Повтори пароль" maxlength="40" autocomplete="new-password"><button type="button" class="pass-eye" onclick="togglePassword('reg-password-confirm',this)" aria-label="Показати пароль"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
       <input class="lock-input" id="reg-email" type="email" placeholder="Email" autocomplete="email" style="margin-top:8px">
       <button class="lock-btn" id="reg-submit-btn" onclick="submitRegisterRequest()">Надіслати код на пошту</button>
       <div class="lock-err" id="reg1-err"></div>
@@ -567,7 +579,7 @@ button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.t
     <div id="auth-view-forgot2" class="auth-view" style="display:none">
       <div class="lock-sub">Введи код та новий пароль</div>
       <div class="mail-notice">📧 <b>Перевір пошту</b><br>Якщо листа немає у папці «Вхідні», обов’язково перевір <b>«Спам»</b> або <b>«Небажана пошта»</b>. Лист може надійти із невеликою затримкою.</div><input class="lock-input" id="forgot-code" type="text" inputmode="numeric" placeholder="000000" maxlength="6">
-      <input class="lock-input" id="forgot-newpass" type="password" placeholder="Новий пароль" maxlength="40" autocomplete="new-password" style="margin-top:8px" onkeydown="if(event.key==='Enter')submitForgotConfirm()">
+      <div class="pass-wrap"><input class="lock-input" id="forgot-newpass" type="password" placeholder="Новий пароль" maxlength="40" autocomplete="new-password" onkeydown="if(event.key==='Enter')submitForgotConfirm()"><button type="button" class="pass-eye" onclick="togglePassword('forgot-newpass',this)" aria-label="Показати пароль"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
       <button class="lock-btn" id="forgot2-submit-btn" onclick="submitForgotConfirm()">Змінити пароль</button>
       <div class="lock-err" id="forgot2-err"></div>
       <div style="margin-top:14px;font-size:12px;color:var(--text3)">
@@ -625,7 +637,7 @@ button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.t
       <div><div class="logo-sub">Навчальний планер</div><div class="logo-title">TS</div></div>
     </div>
     <div style="display:flex;align-items:flex-start;gap:10px">
-      <div style="position:relative;margin-top:2px">
+      <div class="bell-wrap" style="margin-top:2px">
         <button id="bell-btn" onclick="toggleNotifCenter()" style="background:none;border:none;cursor:pointer;padding:4px;border-radius:10px;transition:background .2s;line-height:1;display:flex;align-items:center;justify-content:center;color:var(--text2)" title="Сповіщення"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6"/><path d="M10 21a2 2 0 0 0 4 0"/></svg></button>
         <span id="bell-badge" style="display:none;position:absolute;top:0px;right:0px;background:var(--danger);color:#fff;font-size:9px;font-weight:900;border-radius:50%;width:16px;height:16px;line-height:16px;text-align:center;font-family:var(--font-mono);pointer-events:none">0</span>
       </div>
@@ -1308,6 +1320,31 @@ function openEditNote(id){
   document.getElementById('notes-modal-overlay').classList.remove('hidden');
 }
 function closeNotesModal(){document.getElementById('notes-modal-overlay').classList.add('hidden');}
+
+const NOTE_REMINDER_THRESHOLDS=[{mins:1440,key:'24h',title:'🔔 Дедлайн завтра',body:'До дедлайну нотатки залишилась доба.'},{mins:180,key:'3h',title:'⏳ Дедлайн наближається',body:'До дедлайну нотатки залишилось близько 3 годин.'},{mins:60,key:'1h',title:'🚨 Залишилась 1 година',body:'До дедлайну нотатки залишилась приблизно 1 година.'}];
+function noteReminderStore(){try{return JSON.parse(localStorage.getItem('ts_note_reminders')||'{}')}catch{return {}}}
+function saveNoteReminderStore(v){localStorage.setItem('ts_note_reminders',JSON.stringify(v))}
+async function fireNoteReminder(note,kind,title,body){
+  const store=noteReminderStore(), dayKey=new Date().toISOString().slice(0,10), key=`${note.id}_${kind}_${dayKey}`;
+  if(store[key])return; store[key]=Date.now(); saveNoteReminderStore(store);
+  addNotif(title,`${note.text.slice(0,100)} — ${body}`,'note');
+  if(Notification.permission==='granted' && navigator.serviceWorker){
+    try{const reg=await navigator.serviceWorker.ready; await reg.showNotification(title,{body:`${note.text.slice(0,100)} — ${body}`,icon:'/icon-192.png',badge:'/icon-192.png',tag:`note-${note.id}-${kind}`,renotify:true,data:{url:'/'}})}catch{}
+  }
+}
+async function checkNoteReminders(){
+  const now=Date.now();
+  for(const n of notes){
+    if(n.done||!n.deadline)continue;
+    const ts=new Date(n.deadline).getTime(); if(!Number.isFinite(ts))continue;
+    const diff=(ts-now)/60000;
+    for(const r of NOTE_REMINDER_THRESHOLDS){
+      if(diff<=r.mins && diff>r.mins-1.25){ await fireNoteReminder(n,r.key,r.title,r.body); }
+    }
+    if(diff<=0 && diff>-1.25) await fireNoteReminder(n,'overdue','⚠️ Нотатку прострочено','Дедлайн уже настав.');
+  }
+}
+
 function saveNote(){
   const text=document.getElementById('nf-text').value.trim();
   if(!text)return;
@@ -1320,7 +1357,7 @@ function saveNote(){
   }
   saveNotes();
   closeNotesModal();
-  renderNotes();
+  renderNotes(); checkNoteReminders();
 }
 function deleteNote(){
   if(!editingNoteId)return;
@@ -1360,6 +1397,7 @@ const ICON_PATHS={
   calendar:'<rect x="3" y="4" width="18" height="18" rx="3"/><path d="M16 2v4M8 2v4M3 10h18"/><circle cx="8" cy="15" r="1"/><circle cx="12" cy="15" r="1"/><circle cx="16" cy="15" r="1"/>',
   refresh:'<path d="M3 12a9 9 0 0 1 15-6.7L21 8"/><path d="M21 3v5h-5"/><path d="M21 12a9 9 0 0 1-15 6.7L3 16"/><path d="M3 21v-5h5"/>',
   eye:'<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/>',
+  eyeOff:'<path d="m3 3 18 18"/><path d="M10.6 10.6a2 2 0 0 0 2.8 2.8"/><path d="M9.9 4.3A11.2 11.2 0 0 1 12 4c6.5 0 10 8 10 8a18 18 0 0 1-3.1 4.1M6.2 6.2C3.5 8.1 2 12 2 12s3.5 8 10 8c1.4 0 2.7-.3 3.8-.8"/>',
   check:'<path d="M20 6 9 17l-5-5"/>',
   lock:'<rect x="5" y="11" width="14" height="9" rx="2.5"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>',
   book:'<path d="M4 4.5A2.5 2.5 0 0 1 6.5 2H20v17H6.5A2.5 2.5 0 0 0 4 21.5v-17Z"/><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/>',
@@ -1569,20 +1607,29 @@ async function submitAuth(){
   }
 }
 
+function togglePassword(id,btn){
+  const el=document.getElementById(id); if(!el)return;
+  const show=el.type==='password'; el.type=show?'text':'password';
+  btn.innerHTML=show?ico('eyeOff',18):ico('eye',18);
+  btn.setAttribute('aria-label',show?'Сховати пароль':'Показати пароль');
+}
+
 let pendingRegEmail='';
 async function submitRegisterRequest(){
   const username=document.getElementById('reg-username').value.trim();
   const password=document.getElementById('reg-password').value;
+  const confirmPassword=document.getElementById('reg-password-confirm').value;
   const email=document.getElementById('reg-email').value.trim();
   const errEl=document.getElementById('reg1-err');
   errEl.textContent='';
-  if(!username||!password||!email){errEl.textContent='❌ Заповни всі поля';return;}
+  if(!username||!password||!confirmPassword||!email){errEl.textContent='❌ Заповни всі поля';return;}
+  if(password!==confirmPassword){errEl.textContent='❌ Паролі не збігаються';return;}
   const btn=document.getElementById('reg-submit-btn');
   btn.disabled=true;btn.textContent='Зачекай...';
   try{
     const res=await fetch('/.netlify/functions/register',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({action:'request',username,password,email})
+      body:JSON.stringify({action:'request',username,password,confirmPassword,email})
     });
     const data=await res.json();
     btn.disabled=false;btn.textContent='Надіслати код на пошту';
@@ -2021,6 +2068,8 @@ if(navigator.serviceWorker){
   });
 }
 setInterval(()=>{if(Notification.permission==='granted')sendScheduleToSW();},5*60*1000);
+setInterval(checkNoteReminders,30*1000);
+setTimeout(checkNoteReminders,1200);
 
 // ===== OFFLINE =====
 function updateOnline(){const b=document.getElementById('offline-bar');navigator.onLine?setTimeout(()=>b.style.display='none',2000):b.style.display='block';}
