@@ -2,6 +2,7 @@
 <html lang="uk">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self';">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Адмін-панель — TS Розклад</title>
 <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;600;700;800&family=Orbitron:wght@700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
@@ -48,8 +49,57 @@ tbody tr:hover{background:rgba(96,165,250,.035)}
 <script>
 const API='/.netlify/functions/admin';
 let users=[], currentTab='users', currentAdmin='', currentIsMaster=false;
-function authHeaders(){const t=localStorage.getItem('ts_token');return t?{'Authorization':'Bearer '+t}:{}}
-async function callAdmin(action,extra={}){const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({action,...extra})});const d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.error||'Помилка');return d}
+function getDeviceId(){let id=localStorage.getItem('ts_device_id');if(!id){id=(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));localStorage.setItem('ts_device_id',id);}return id;}
+function authHeaders(){return localStorage.getItem('ts_authed')==='1'?{'X-TS-Device-ID':getDeviceId()}:{} }
+let adminReauthPromise=null;
+async function rawAdmin(action,extra={}){const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({action,...extra})});const d=await r.json().catch(()=>({}));return {r,d}}
+async function ensureAdminReauth(){
+  if(adminReauthPromise)return adminReauthPromise;
+  adminReauthPromise=(async()=>{
+    const password=prompt('🔐 Пароль адмінки\n\nДля критичної операції введи ОКРЕМИЙ пароль адмінки.\nВін не зберігається в браузері.');
+    if(password===null||!password)return false;
+    const {r,d}=await rawAdmin('reauth-admin',{password});
+    if(r.status===409&&d.setupRequired){
+      if(confirm('Окремий пароль адмінки ще не створено. Створити його зараз?')){await setupAdminPassword();}
+      return false;
+    }
+    if(!r.ok){alert('❌ '+(d.error||'Не вдалося перевірити пароль адмінки'));return false;}
+    if(d.requires2FA){
+      const code=prompt(`📧 Код на email ${d.emailMasked||'адміністратора'}\n\nВведи 6-значний код із листа. Код дійсний 10 хвилин.`);
+      if(code===null||!code)return false;
+      const v=await rawAdmin('verify-admin-2fa',{code});
+      if(!v.r.ok){alert('❌ '+(v.d.error||'Невірний код 2FA'));return false;}
+    }
+    return true;
+  })().finally(()=>{adminReauthPromise=null});
+  return adminReauthPromise;
+}
+async function setupAdminPassword(){
+  const currentPassword=prompt('🔐 Введи поточний пароль\n\nЯкщо окремий пароль адмінки вже створено — введи саме його.\nЯкщо це перше налаштування — введи пароль звичайного акаунта.');
+  if(currentPassword===null||!currentPassword)return false;
+  const newPassword=prompt('🔑 Створи окремий пароль адмінки\n\nМінімум 12 символів. Не використовуй пароль звичайного акаунта.');
+  if(newPassword===null||!newPassword)return false;
+  const confirmPassword=prompt('🔑 Повтори пароль адмінки');
+  if(confirmPassword===null||!confirmPassword)return false;
+  const {r,d}=await rawAdmin('setup-admin-password-start',{currentPassword,newPassword,confirmPassword});
+  if(!r.ok){alert('❌ '+(d.error||'Не вдалося розпочати налаштування'));return false;}
+  const code=prompt(`📧 Код на email ${d.emailMasked||'адміністратора'}\n\nВведи 6-значний код для завершення створення пароля адмінки.`);
+  if(code===null||!code)return false;
+  const v=await rawAdmin('setup-admin-password-verify',{code});
+  if(!v.r.ok){alert('❌ '+(v.d.error||'Не вдалося створити пароль адмінки'));return false;}
+  alert(v.d.changed ? '✅ Пароль адмінки змінено. Інші адмінські сесії завершено.' : '✅ Окремий пароль адмінки створено.');
+  return true;
+}
+
+async function callAdmin(action,extra={},retry=true){
+  let {r,d}=await rawAdmin(action,extra);
+  if(r.status===428&&d.requiresAdminReauth&&retry){
+    const ok=await ensureAdminReauth();
+    if(ok)return callAdmin(action,extra,false);
+  }
+  if(!r.ok)throw new Error(d.error||'Помилка');
+  return d;
+}
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
 function fmt(ts){return ts?new Date(ts).toLocaleString('uk-UA',{day:'2-digit',month:'2-digit',hour:'2-digit',minute:'2-digit'}):'—'}
 function openModal(html){document.getElementById('modalBox').innerHTML=html;document.getElementById('modal').style.display='flex'}
@@ -58,7 +108,7 @@ document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='
 
 async function load(){
   const root=document.getElementById('root');
-  if(!localStorage.getItem('ts_token')){root.innerHTML='<div class="state err">Увійди в основному застосунку на цьому пристрої.</div>';return}
+  if(localStorage.getItem('ts_authed')!=='1'){root.innerHTML='<div class="state err">Увійди в основному застосунку на цьому пристрої.</div>';return}
   root.innerHTML='<div class="state">Завантаження...</div>';
   try{const d=await callAdmin('list-users');users=d.users||[];currentAdmin=d.currentAdmin||'';currentIsMaster=!!d.currentIsMaster;render()}
   catch(e){root.innerHTML=`<div class="state err">❌ ${esc(e.message)}</div>`}
@@ -84,36 +134,71 @@ function renderUsers(){
   <td>${u.banned?'<span class="badge banned">ЗАБЛОКОВАНО</span>':'<span class="badge ok">АКТИВНИЙ</span>'}</td>
   <td style="white-space:nowrap">
     ${u.username===currentAdmin?'<span class="badge admin" title="Власний акаунт">ЦЕ ВИ</span>':(u.isMaster?'<span class="badge admin" title="Головного адміністратора не можна блокувати або змінювати">ЗАХИЩЕНО</span>':(!currentIsMaster&&u.role==='admin'?'<span class="badge admin" title="Звичайний адміністратор не може керувати іншим адміністратором">ЗАХИЩЕНО</span>':''))}
+    <button class="btn blue" onclick="showAccountDetails('${esc(u.username)}')">🔎 Деталі</button>
     ${u.username!==currentAdmin && !u.isMaster && (currentIsMaster || u.role!=='admin')?`<button class="btn blue" onclick="editEmail('${esc(u.username)}','${esc(u.email||'')}')">✉️ Email</button>
     <button class="btn blue" onclick="editRole('${esc(u.username)}','${u.role||'user'}')">👑 Роль</button>
     <button class="btn ${u.banned?'unban':'ban'}" onclick="showBan('${esc(u.username)}',${u.banned})">${u.banned?'Розблокувати':'Заблокувати'}</button>
     <button class="btn del" onclick="showDelete('${esc(u.username)}')">Видалити</button>`:''}
   </td></tr>`).join('');
-  c.innerHTML=`<div class="panel"><div class="toolbar"><button class="refresh" onclick="load()">🔄 Оновити</button></div><div class="wrap"><table><thead><tr><th>Користувач</th><th>Email</th><th>Сесії</th><th>IP</th><th>Активність</th><th>Статус</th><th>Дії</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
+  c.innerHTML=`<div class="panel"><div class="toolbar"><button class="refresh" onclick="load()">🔄 Оновити</button><button class="btn blue" onclick="setupAdminPassword()">🔐 Пароль адмінки</button><a class="btn gray" href="/admin-recovery.html" style="text-decoration:none">🆘 Аварійне відновлення</a></div><div class="wrap"><table><thead><tr><th>Користувач</th><th>Email</th><th>Сесії</th><th>IP</th><th>Активність</th><th>Статус</th><th>Дії</th></tr></thead><tbody>${rows}</tbody></table></div></div>`;
 }
+function showAccountDetails(username){
+  callAdmin('account-details',{username}).then(d=>{
+    const p=d.profile||{}, sessions=d.sessions||[], activity=d.activity||[];
+    const sessionRows=sessions.map(x=>`<div class="row"><div><b>${esc(x.device?.type||'💻')} · ${esc(x.device?.os||'')} · ${esc(x.device?.browser||'')}</b><div class="small mono">IP: ${esc(x.ip)} · створено: ${fmt(x.createdAt)} · активність: ${fmt(x.lastActive)} · до: ${fmt(x.expiresAt)}</div><div class="small">${esc(x.userAgent||'')}</div></div><button class="btn del" onclick="revokeSession('${esc(username)}','${esc(x.id)}')">Завершити</button></div>`).join('');
+    const actRows=activity.map(x=>`<div class="row"><div><b>${esc(activityLabel(x.type))}</b><div class="small">${fmt(x.at)}</div><div class="small mono">${esc(JSON.stringify(x.details||{}))}</div></div></div>`).join('');
+    openModal(`<h2>🔎 Акаунт: ${esc(username)}</h2><div class="hint">Створено: ${fmt(p.createdAt)} · Остання активність: ${fmt(p.lastActive)}</div>
+      <div class="dangerbox" style="margin-bottom:12px">${p.banned?'🚫 Заблоковано: '+esc(p.banReason||'без причини')+' · до: '+(p.banExpiresAt?fmt(p.banExpiresAt):'назавжди'):'🟢 Акаунт активний'}<br>Email: ${esc(p.email||'—')} · ${p.emailVerified?'підтверджено':'не підтверджено'}</div>
+      <h3>📱 Активні сесії (${sessions.length})</h3>${sessionRows||'<div class="state">Активних сесій немає.</div>'}
+      <h3 style="margin-top:16px">📋 Історія дій (${activity.length})</h3>${actRows||'<div class="state">Історія порожня.</div>'}
+      <div class="actions"><button class="btn gray" onclick="closeModal()">Закрити</button><button class="btn del" onclick="clearHistory('${esc(username)}')">Очистити історію</button></div>`);
+  }).catch(e=>alert('❌ '+e.message));
+}
+function activityLabel(type){const m={login:'Вхід', 'login-failed':'Невдалий вхід','login-challenge':'Потрібне підтвердження входу','login-email-verified':'Вхід підтверджено email','new-device-email':'Лист про новий пристрій',logout:'Вихід','session-ended':'Сесію завершено','password-changed':'Пароль змінено','password-reset-request':'Запит відновлення пароля','password-reset-completed':'Пароль відновлено','email-change-request':'Запит зміни email','email-changed':'Email змінено','admin-email-changed':'Email змінено адміністратором','admin-email-removed':'Email видалено адміністратором','account-banned':'Акаунт заблоковано','account-unbanned':'Акаунт розблоковано','security-settings-changed':'Змінено налаштування безпеки','account-created':'Акаунт створено','history-cleared':'Історію очищено'};return m[type]||type}
+async function clearHistory(username){
+  const phrase=prompt(`Це незворотне очищення історії акаунта ${username}.
+
+Введи точно: CLEAR ${username}`);
+  if(phrase===null)return;
+  if(phrase!==`CLEAR ${username}`){alert('❌ Неправильне підтвердження. Історію не очищено.');return;}
+  if(!confirm('Останнє підтвердження: остаточно очистити історію?'))return;
+  try{await callAdmin('clear-account-history',{username,confirm:phrase});closeModal();alert('✅ Історію очищено.');}catch(e){alert('❌ '+e.message)}
+}
+
 function showSessions(username){
   callAdmin('list-sessions',{username}).then(d=>{
     const rows=(d.sessions||[]).map(s=>`<div class="row"><div><div class="device">${esc(s.device?.type||'💻')} · ${esc(s.device?.os||'')} · ${esc(s.device?.browser||'')}</div><div class="small mono">IP: ${esc(s.ip)} · створено: ${fmt(s.createdAt)} · активність: ${fmt(s.lastActive)}</div><div class="small">${esc(s.userAgent)}</div></div><button class="btn del" onclick="revokeSession('${esc(username)}','${esc(s.id)}')">Завершити</button></div>`).join('');
     openModal(`<h2>📱 Сесії: ${esc(username)}</h2><div class="hint">Активних сесій: ${(d.sessions||[]).length}</div>${rows||'<div class="state">Активних сесій немає.</div>'}<div class="actions"><button class="btn gray" onclick="closeModal()">Закрити</button><button class="btn del" onclick="revokeAll('${esc(username)}')">Завершити всі</button></div>`);
   }).catch(e=>alert('❌ '+e.message))
 }
-async function revokeSession(username,id){try{await callAdmin('revoke-session',{username,sessionId:id});showSessions(username);load()}catch(e){alert('❌ '+e.message)}}
-async function revokeAll(username){if(!confirm('Завершити всі сесії цього користувача?'))return;try{await callAdmin('revoke-all-sessions',{username});closeModal();load()}catch(e){alert('❌ '+e.message)}}
+async function revokeSession(username,id){if(!confirm(`Завершити цю сесію користувача ${username}?`))return;try{await callAdmin('revoke-session',{username,sessionId:id,confirm:`REVOKE ${username} ${id}`});showSessions(username);load()}catch(e){alert('❌ '+e.message)}}
+async function revokeAll(username){if(!confirm('Завершити всі сесії цього користувача?'))return;try{await callAdmin('revoke-all-sessions',{username,confirm:`REVOKE ${username}`});closeModal();load()}catch(e){alert('❌ '+e.message)}}
 
-function editEmail(username,current){const v=prompt(`Email для ${username}:`,current||'');if(v===null)return;const email=v.trim();if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){alert('❌ Невірний формат email');return}callAdmin('update-email',{username,email}).then(()=>load()).catch(e=>alert('❌ '+e.message))}
+function editEmail(username,current){
+ const v=prompt(`Email для ${username}:`,current||'');if(v===null)return;const email=v.trim();
+ if(email&&!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){alert('❌ Невірний формат email');return}
+ callAdmin('update-email',{username,email,confirm:`EMAIL ${username}`}).then(d=>{
+   if(d.confirmationSent){
+     const code=prompt('Email змінено. Користувач має передати адміністратору код із листа. Якщо код уже отримано, введи його зараз для підтвердження:', '');
+     if(code)callAdmin('confirm-admin-email',{username,code,confirm:`EMAIL-CONFIRM ${username}`}).then(()=>alert('✅ Код підтверджено.')).catch(e=>alert('❌ '+e.message));
+     else alert('ℹ️ Email змінено, але код поки не підтверджено.');
+   } else alert('✅ Збережено.');
+   load();
+ }).catch(e=>alert('❌ '+e.message));
+}
 function editRole(username,current){
   if(username===currentAdmin){alert('Це ваш поточний акаунт. Роль головного адміністратора визначається через ADMIN_USERNAME.');return}
   openModal(`<h2>👑 Роль: ${esc(username)}</h2><div class="field"><label>РОЛЬ</label><select id="roleSelect"><option value="user" ${current==='user'?'selected':''}>Користувач</option><option value="admin" ${current==='admin'?'selected':''}>Адміністратор</option></select></div><div class="actions"><button class="btn gray" onclick="closeModal()">Скасувати</button><button class="btn blue" onclick="saveRole('${esc(username)}')">Зберегти</button></div>`);
 }
-async function saveRole(username){try{await callAdmin('set-role',{username,role:document.getElementById('roleSelect').value});closeModal();load()}catch(e){alert('❌ '+e.message)}}
+async function saveRole(username){try{await callAdmin('set-role',{username,role:document.getElementById('roleSelect').value,confirm:`ROLE ${username}`});closeModal();load()}catch(e){alert('❌ '+e.message)}}
 
 function showBan(username,isBanned){
- if(isBanned){if(!confirm(`Розблокувати ${username}?`))return;callAdmin('unban-user',{username}).then(()=>load()).catch(e=>alert('❌ '+e.message));return}
+ if(isBanned){if(!confirm(`Розблокувати ${username}?`))return;callAdmin('unban-user',{username,confirm:`UNBAN ${username}`}).then(()=>load()).catch(e=>alert('❌ '+e.message));return}
  openModal(`<h2>🚫 Заблокувати: ${esc(username)}</h2><div class="field"><label>ПРИЧИНА ДЛЯ КОРИСТУВАЧА</label><textarea id="banReason" placeholder="Наприклад: спам, порушення правил..."></textarea></div><div class="field"><label>ТЕРМІН БАНУ АКАУНТА</label><select id="banDuration"><option value="hour">1 година</option><option value="day">1 день</option><option value="week">7 днів</option><option value="forever" selected>Назавжди</option></select></div><div class="checks"><label class="check"><input id="blockIp" type="checkbox"> Одночасно заблокувати IP-адреси активних сесій</label></div><div class="field"><label>ТЕРМІН IP-БЛОКУ</label><select id="ipDuration"><option value="hour">1 година</option><option value="day">1 день</option><option value="week">7 днів</option><option value="forever" selected>Назавжди</option></select></div><div class="dangerbox">Бан акаунта одразу завершить усі його активні сесії.</div><div class="actions"><button class="btn gray" onclick="closeModal()">Скасувати</button><button class="btn del" onclick="doBan('${esc(username)}')">Заблокувати</button></div>`);
 }
-async function doBan(username){try{await callAdmin('ban-user',{username,reason:document.getElementById('banReason').value,duration:document.getElementById('banDuration').value,blockIp:document.getElementById('blockIp').checked,ipDuration:document.getElementById('ipDuration').value});closeModal();load()}catch(e){alert('❌ '+e.message)}}
-function showDelete(username){openModal(`<h2>🗑️ Видалити: ${esc(username)}</h2><div class="dangerbox">Це видалить акаунт і його серверні дані. Скасувати операцію після виконання не можна.</div><div class="checks"><label class="check"><input id="deleteBlockIp" type="checkbox"> Також заблокувати IP активних сесій</label></div><div class="field"><label>ТЕРМІН IP-БЛОКУ</label><select id="deleteIpDuration"><option value="hour">1 година</option><option value="day">1 день</option><option value="week">7 днів</option><option value="forever" selected>Назавжди</option></select></div><div class="actions"><button class="btn gray" onclick="closeModal()">Скасувати</button><button class="btn del" onclick="doDelete('${esc(username)}')">Видалити</button></div>`)}
-async function doDelete(username){if(!confirm(`Остаточно видалити ${username}?`))return;try{await callAdmin('delete-user',{username,blockIp:document.getElementById('deleteBlockIp').checked,ipDuration:document.getElementById('deleteIpDuration').value});closeModal();load()}catch(e){alert('❌ '+e.message)}}
+async function doBan(username){try{await callAdmin('ban-user',{username,confirm:`BAN ${username}`,reason:document.getElementById('banReason').value,duration:document.getElementById('banDuration').value,blockIp:document.getElementById('blockIp').checked,ipDuration:document.getElementById('ipDuration').value});closeModal();load()}catch(e){alert('❌ '+e.message)}}
+function showDelete(username){openModal(`<h2>🗑️ Видалити: ${esc(username)}</h2><div class="dangerbox">Це видалить акаунт і його серверні дані. Скасувати операцію після виконання не можна. Для критичної дії додатково знадобиться пароль адміністратора та точне підтвердження.</div><div class="checks"><label class="check"><input id="deleteBlockIp" type="checkbox"> Також заблокувати IP активних сесій</label></div><div class="field"><label>ТЕРМІН IP-БЛОКУ</label><select id="deleteIpDuration"><option value="hour">1 година</option><option value="day">1 день</option><option value="week">7 днів</option><option value="forever" selected>Назавжди</option></select></div><div class="actions"><button class="btn gray" onclick="closeModal()">Скасувати</button><button class="btn del" onclick="doDelete('${esc(username)}')">Видалити</button></div>`)}
+async function doDelete(username){if(!confirm(`Остаточно видалити ${username}?`))return;try{await callAdmin('delete-user',{username,confirm:`DELETE ${username}`,blockIp:document.getElementById('deleteBlockIp').checked,ipDuration:document.getElementById('deleteIpDuration').value});closeModal();load()}catch(e){alert('❌ '+e.message)}}
 
 async function loadIps(){try{const d=await callAdmin('ip-list');renderIpList(d.bans||[])}catch(e){document.getElementById('content').innerHTML=`<div class="panel state err">❌ ${esc(e.message)}</div>`}}
 function renderIps(bans){
@@ -122,10 +207,10 @@ function renderIps(bans){
  c.innerHTML=`<div class="panel"><div class="toolbar"><button class="btn blue" onclick="showIpBan()">➕ Заблокувати IP вручну</button><button class="refresh" onclick="loadIps()">🔄 Оновити</button></div><div class="wrap"><table><thead><tr><th>IP</th><th>Причина</th><th>Користувач</th><th>Створено</th><th>До</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="6" class="muted">Заблокованих IP немає.</td></tr>'}</tbody></table></div></div>`;
 }
 function showIpBan(){openModal(`<h2>🚫 Заблокувати IP</h2><div class="field"><label>IP-АДРЕСА</label><input id="manualIp" placeholder="185.123.45.67"></div><div class="field"><label>ПРИЧИНА</label><input id="manualReason" placeholder="Спам"></div><div class="field"><label>ТЕРМІН</label><select id="manualDuration"><option value="hour">1 година</option><option value="day">1 день</option><option value="week">7 днів</option><option value="forever">Назавжди</option></select></div><div class="actions"><button class="btn gray" onclick="closeModal()">Скасувати</button><button class="btn del" onclick="doIpBan()">Заблокувати</button></div>`)}
-async function doIpBan(){try{await callAdmin('ip-ban',{ip:document.getElementById('manualIp').value.trim(),reason:document.getElementById('manualReason').value,duration:document.getElementById('manualDuration').value});closeModal();loadIps()}catch(e){alert('❌ '+e.message)}}
-async function unbanIp(ip){if(!confirm(`Розблокувати IP ${ip}?`))return;try{await callAdmin('ip-unban',{ip});loadIps()}catch(e){alert('❌ '+e.message)}}
+async function doIpBan(){try{await callAdmin('ip-ban',{ip:document.getElementById('manualIp').value.trim(),confirm:'BAN IP',reason:document.getElementById('manualReason').value,duration:document.getElementById('manualDuration').value});closeModal();loadIps()}catch(e){alert('❌ '+e.message)}}
+async function unbanIp(ip){if(!confirm(`Розблокувати IP ${ip}?`))return;try{await callAdmin('ip-unban',{ip,confirm:'UNBAN IP'});loadIps()}catch(e){alert('❌ '+e.message)}}
 
-async function loadAudit(){try{const d=await callAdmin('audit-log');const rows=(d.log||[]).map(x=>`<div class="row"><div><b>${esc(x.action)}</b><div class="small">${fmt(x.at)} · адмін: ${esc(x.adminUsername)}</div><div class="small mono">${esc(JSON.stringify(x.details||{}))}</div></div></div>`).join('');document.getElementById('content').innerHTML=`<div class="panel">${rows||'<div class="state">Журнал порожній.</div>'}</div>`}catch(e){document.getElementById('content').innerHTML=`<div class="panel state err">❌ ${esc(e.message)}</div>`}}
+async function loadAudit(){try{const d=await callAdmin('audit-log');const integrity=d.integrity||{};const integrityHtml=integrity.valid===false?'<div class="dangerbox" style="margin-bottom:12px">⚠️ Виявлено порушення цілісності журналу адміністратора. Перевірте серверні журнали та доступи.</div>':'<div class="hint">🔗 Цілісність журналу: '+(integrity.valid?'підтверджена':'невідома')+' · записів: '+esc(integrity.count??(d.log||[]).length)+'</div>';const rows=(d.log||[]).map(x=>`<div class="row"><div><b>${esc(x.action)}</b><div class="small">${fmt(x.at)} · адмін: ${esc(x.adminUsername)}</div><div class="small mono">${esc(JSON.stringify(x.details||{}))}</div></div></div>`).join('');document.getElementById('content').innerHTML=`<div class="panel">${integrityHtml}${rows||'<div class="state">Журнал порожній.</div>'}</div>`}catch(e){document.getElementById('content').innerHTML=`<div class="panel state err">❌ ${esc(e.message)}</div>`}}
 load();
 </script>
 </body>

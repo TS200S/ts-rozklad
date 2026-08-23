@@ -1,0 +1,12 @@
+TS Розклад V5.2.3 — Emergency Admin Recovery
+
+Added:
+- Public /admin-recovery.html emergency recovery flow.
+- One-time 6-digit email code, 10-minute expiry, 5 attempts.
+- Rate limiting for recovery requests and verification.
+- No account-enumeration response.
+- New admin password is scrypt-hashed with a fresh salt.
+- Old admin sessions are revoked after successful recovery.
+- Recovery events are added to the admin audit log without storing the code.
+- Added Ukrainian recovery email template.
+- Added recovery link to admin toolbar.

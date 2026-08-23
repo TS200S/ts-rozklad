@@ -2,6 +2,7 @@
 <html lang="uk">
 <head>
 <meta charset="UTF-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self';">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>TS Розклад</title>
 <link rel="manifest" href="manifest.json">
@@ -538,6 +539,17 @@ button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.t
       </div>
     </div>
 
+    <!-- LOGIN STEP 2: email confirmation -->
+    <div id="auth-view-login2" class="auth-view" style="display:none">
+      <div class="lock-sub">Підтверди новий вхід</div>
+      <div style="font-size:12px;color:var(--text3);margin-bottom:10px" id="login2-email-hint"></div>
+      <div class="mail-notice">📧 <b>Перевір пошту</b><br>На твою підтверджену адресу надіслано код. Якщо це не ти — не вводь код.</div>
+      <input class="lock-input" id="login2-code" type="text" inputmode="numeric" placeholder="000000" maxlength="6" onkeydown="if(event.key==='Enter')submitLoginVerification()">
+      <button class="lock-btn" id="login2-submit-btn" onclick="submitLoginVerification()">Підтвердити вхід</button>
+      <div class="lock-err" id="login2-err"></div>
+      <div style="margin-top:14px;font-size:12px;color:var(--text3)"><a href="javascript:void(0)" onclick="showAuthView('login')" style="color:var(--text3);text-decoration:none">← Скасувати</a></div>
+    </div>
+
     <!-- REGISTER STEP 1: username/password/email -->
     <div id="auth-view-reg1" class="auth-view" style="display:none">
       <div class="lock-sub">Створи новий акаунт</div>
@@ -694,6 +706,16 @@ button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.t
       <button class="mbcancel" onclick="closeModal()">Скасувати</button>
       <button class="mbsave" onclick="saveSlot()">Зберегти</button>
     </div>
+  </div>
+</div>
+
+<!-- SECURITY MODAL -->
+<div class="overlay hidden" id="security-modal-overlay" onclick="if(event.target===this)closePasswordChange()">
+  <div class="modal"><div class="mhandle"></div><div class="mtitle">Змінити пароль</div>
+    <div class="fw"><div class="fl">Поточний пароль</div><input class="fi" id="pw-current" type="password" autocomplete="current-password"></div>
+    <div class="fw"><div class="fl">Новий пароль</div><input class="fi" id="pw-new" type="password" autocomplete="new-password"></div>
+    <div class="fw"><div class="fl">Повтори новий пароль</div><input class="fi" id="pw-confirm" type="password" autocomplete="new-password"></div>
+    <div class="lock-err" id="pw-err"></div><div class="mbtns"><button class="mbcancel" onclick="closePasswordChange()">Скасувати</button><button class="mbsave" id="pw-save" onclick="submitPasswordChange()">Змінити пароль</button></div>
   </div>
 </div>
 
@@ -876,7 +898,7 @@ function render(){
   else if(ctab==='lectures')renderLec();
   else if(ctab==='edit')renderEdit();
   else if(ctab==='notes')renderNotes();
-  else if(ctab==='settings')renderCfg();
+  else if(ctab==='settings'){renderCfg();setTimeout(loadSecuritySettings,0);}
 }
 
 // ===== TODAY =====
@@ -1391,6 +1413,8 @@ const ICON_PATHS={
   sliders:'<path d="M4 6h10M18 6h2M4 12h4M12 12h8M4 18h13M21 18h-1"/><circle cx="16" cy="6" r="2"/><circle cx="8" cy="12" r="2"/><circle cx="19" cy="18" r="2"/>',
   rocket:'<path d="M14.5 2c2.5 1 4 3.5 4.5 6.5-3 .5-5.5 2-6.5 4.5L8 15l-3-3 2-4.5C9.5 6.5 11 4 14.5 2Z"/><path d="M9 15l-4 4M6 12l-2 2M12 18l-2 2"/><circle cx="15" cy="9" r="1.3" fill="currentColor"/>',
   cloud:'<path d="M7 18a4.5 4.5 0 0 1-.5-9 5.5 5.5 0 0 1 10.7-1.7A4 4 0 0 1 17 18H7Z"/>',
+  shield:'<path d="M12 3 20 6v5c0 5-3.5 8.5-8 10-4.5-1.5-8-5-8-10V6l8-3Z"/><path d="m9 12 2 2 4-4"/>',
+  mail:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/>',
   key:'<circle cx="8" cy="15" r="4"/><path d="M11 12l8-8M16 5l2 2M13.5 7.5l2 2"/>',
   upload:'<path d="M12 16V4M7 9l5-5 5 5"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>',
   download:'<path d="M12 4v12M7 11l5 5 5-5"/><path d="M4 16v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/>',
@@ -1427,6 +1451,13 @@ function renderCfg(){
     <div class="sec-label">Ім'я</div><div class="sec-sub">Як до тебе звертатись</div>
     <input class="sec-input" id="s-name" value="${esc(cfg.name)}" placeholder="Студенте">
   </div></div></div>
+  <div class="sec-title">Безпека акаунта</div>
+  <div class="sec-card">
+    <div class="sec-row"><div class="sec-ico">${ico('shield')}</div><div class="sec-info"><div class="sec-label">Сповіщати про новий пристрій</div><div class="sec-sub">Надсилати лист, коли акаунт відкривають з нового пристрою.</div><div class="tog"><span class="tog-label">Увімкнути</span><label class="tog-sw"><input id="sec-new-device-email" type="checkbox" checked onchange="updateSecuritySetting()"><span class="tog-slider"></span></label></div></div></div>
+    <div class="sec-row"><div class="sec-ico">${ico('lock')}</div><div class="sec-info"><div class="sec-label">Підтвердження нового пристрою через email</div><div class="sec-sub">Без коду з пошти новий пристрій не отримає сесію.</div><div class="tog"><span class="tog-label">Увімкнути</span><label class="tog-sw"><input id="sec-new-device-code" type="checkbox" onchange="updateSecuritySetting()"><span class="tog-slider"></span></label></div></div></div>
+    <div class="sec-row"><div class="sec-ico">${ico('mail')}</div><div class="sec-info"><div class="sec-label">Підтверджувати кожен новий вхід</div><div class="sec-sub">Кожен новий вхід вимагатиме код із підтвердженого email.</div><div class="tog"><span class="tog-label">Увімкнути</span><label class="tog-sw"><input id="sec-every-login" type="checkbox" onchange="updateSecuritySetting()"><span class="tog-slider"></span></label></div></div></div>
+    <div class="sec-row" style="cursor:pointer" onclick="openPasswordChange()"><div class="sec-ico">${ico('key')}</div><div class="sec-info"><div class="sec-label">Змінити пароль</div><div class="sec-sub">Потрібен поточний пароль. Після зміни всі старі сесії завершуються.</div></div></div>
+  </div>
   <div class="sec-title">Повідомлення</div>
   <div class="sec-card">
     <div class="sec-row"><div class="sec-ico">${ico('bell')}</div><div class="sec-info"><div class="sec-label">За 10 хвилин до пари</div>
@@ -1507,6 +1538,7 @@ function renderCfg(){
   <div class="sec-card"><div class="sec-row"><div class="sec-ico">${ico('user')}</div><div class="sec-info"><div class="sec-label">Ти увійшов як ${esc(localStorage.getItem('ts_username')||'—')}</div>
     <div class="sec-sub" style="margin-top:2px">Свій розклад бачиш тільки ти, за твоїм акаунтом</div>
     <button id="admin-panel-btn" class="savebtn" style="margin-top:9px;display:none" onclick="window.open('admin.html','_blank')">${ico('user',16)} Адмін-панель</button>
+    <button class="savebtn" style="margin-top:9px" onclick="openSessionsManager()">${ico('monitor',16)} Активні сесії та пристрої</button>
     <button class="savebtn" style="margin-top:9px;background:var(--danger)" onclick="logoutAccount()">${ico('lock',16)} Вийти з акаунту</button>
   </div></div></div>
   <div class="sec-title">Синхронізація</div>
@@ -1527,6 +1559,34 @@ function renderCfg(){
   const adminBtn=document.getElementById('admin-panel-btn');
   if(adminBtn)adminBtn.style.display=localStorage.getItem('ts_is_admin')==='1'?'block':'none';
 }
+async function loadSecuritySettings(){
+  if(localStorage.getItem('ts_authed')!=='1')return;
+  try{const r=await fetch('/.netlify/functions/update-security',{method:'POST',headers:{'Content-Type':'application/json','X-TS-Device-ID':getDeviceId()},body:JSON.stringify({action:'status'})});const d=await r.json();if(!r.ok)return;
+    const x=d.security||{};
+    const a=document.getElementById('sec-new-device-email'),b=document.getElementById('sec-new-device-code'),c=document.getElementById('sec-every-login');
+    if(a)a.checked=x.newDeviceEmail!==false;if(b)b.checked=x.requireNewDeviceEmail===true;if(c)c.checked=x.requireEveryLoginEmail===true;
+  }catch{}
+}
+async function updateSecuritySetting(){
+  if(localStorage.getItem('ts_authed')!=='1')return;
+  const body={action:'update',newDeviceEmail:document.getElementById('sec-new-device-email')?.checked!==false,requireNewDeviceEmail:document.getElementById('sec-new-device-code')?.checked===true,requireEveryLoginEmail:document.getElementById('sec-every-login')?.checked===true};
+  try{const r=await fetch('/.netlify/functions/update-security',{method:'POST',headers:{'Content-Type':'application/json','X-TS-Device-ID':getDeviceId()},body:JSON.stringify(body)});const d=await r.json();if(!r.ok)throw new Error(d.error||'Помилка');}catch(e){alert('❌ '+e.message);loadSecuritySettings();}
+}
+function openPasswordChange(){
+  document.getElementById('security-modal-overlay').classList.remove('hidden');
+  ['pw-current','pw-new','pw-confirm'].forEach(id=>document.getElementById(id).value='');
+  document.getElementById('pw-err').textContent='';
+}
+function closePasswordChange(){document.getElementById('security-modal-overlay').classList.add('hidden');}
+async function submitPasswordChange(){
+  const currentPassword=document.getElementById('pw-current').value,newPassword=document.getElementById('pw-new').value,confirmPassword=document.getElementById('pw-confirm').value;
+  const err=document.getElementById('pw-err');err.textContent='';
+  if(!currentPassword||!newPassword||!confirmPassword){err.textContent='❌ Заповни всі поля';return;}
+  const btn=document.getElementById('pw-save');btn.disabled=true;btn.textContent='Змінюємо...';
+  try{const r=await fetch('/.netlify/functions/change-password',{method:'POST',headers:{'Content-Type':'application/json','X-TS-Device-ID':getDeviceId()},body:JSON.stringify({currentPassword,newPassword,confirmPassword})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Помилка');alert('Пароль змінено. Для безпеки всі старі сесії завершено. Увійди знову.');closePasswordChange();logoutAccountSilent();}catch(e){err.textContent='❌ '+e.message;btn.disabled=false;btn.textContent='Змінити пароль';}
+}
+function logoutAccountSilent(){['ts_userid','ts_username','ts_token','ts_authed','ts_email','ts_is_admin'].forEach(k=>localStorage.removeItem(k));location.reload();}
+
 function setTheme(t){cfg.theme=t;saveCfg();applyTheme();renderCfg();}
 function setFont(f){cfg.font=f;saveCfg();applyTheme();renderCfg();}
 function setTime24(v){cfg.time24=v;saveCfg();updateClock();renderCfg();}
@@ -1552,7 +1612,7 @@ function importData(e){const file=e.target.files[0];if(!file)return;const r=new 
 
 // ===== ACCOUNT AUTH =====
 function showAuthView(view){
-  ['login','reg1','reg2','forgot1','forgot2'].forEach(v=>{
+  ['login','login2','reg1','reg2','forgot1','forgot2'].forEach(v=>{
     const el=document.getElementById('auth-view-'+v);
     if(el)el.style.display=v===view?'block':'none';
   });
@@ -1568,7 +1628,7 @@ function startSessionWatcher(){
 function onAuthSuccess(data){
   localStorage.setItem('ts_userid',data.userId);
   localStorage.setItem('ts_username',data.username);
-  localStorage.setItem('ts_token',data.token);
+  localStorage.removeItem('ts_token');
   localStorage.setItem('ts_authed','1');
   if(data.email) localStorage.setItem('ts_email',data.email); else localStorage.removeItem('ts_email');
   localStorage.setItem('ts_is_admin',data.role==='admin'?'1':'0');
@@ -1579,6 +1639,12 @@ function onAuthSuccess(data){
   setTimeout(syncNotifLogFromSW,1500);
 }
 
+function getDeviceId(){
+  let id=localStorage.getItem('ts_device_id');
+  if(!id){ id=(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+'-'+Math.random().toString(36).slice(2))+''; localStorage.setItem('ts_device_id',id); }
+  return id;
+}
+let pendingLoginChallenge='';
 async function submitAuth(){
   const username=document.getElementById('auth-username').value.trim();
   const password=document.getElementById('auth-password').value;
@@ -1590,9 +1656,18 @@ async function submitAuth(){
   try{
     const res=await fetch('/.netlify/functions/auth',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({username,password})
+      body:JSON.stringify({username,password,deviceId:getDeviceId()})
     });
     const data=await res.json();
+    if(res.status===202 && data.requiresEmailVerification){
+      pendingLoginChallenge=data.challengeId||'';
+      document.getElementById('login2-email-hint').textContent='Код надіслано на '+(data.email||'підтверджену адресу');
+      document.getElementById('login2-code').value='';
+      document.getElementById('login2-err').textContent='';
+      btn.disabled=false;btn.textContent='Увійти';
+      showAuthView('login2');
+      return;
+    }
     if(!res.ok){
       btn.disabled=false;btn.textContent='Увійти';
       if(data.banned){ showBanModal('account',{reason:data.banReason,expiresAt:data.banExpiresAt}); return; }
@@ -1605,6 +1680,19 @@ async function submitAuth(){
     errEl.textContent='❌ Проблема з мережею, спробуй ще раз';
     btn.disabled=false;btn.textContent='Увійти';
   }
+}
+
+async function submitLoginVerification(){
+  const code=document.getElementById('login2-code').value.trim();
+  const errEl=document.getElementById('login2-err'); errEl.textContent='';
+  if(!pendingLoginChallenge||!/^\d{6}$/.test(code)){errEl.textContent='❌ Введи 6-значний код';return;}
+  const btn=document.getElementById('login2-submit-btn'); btn.disabled=true; btn.textContent='Перевіряємо...';
+  try{
+    const res=await fetch('/.netlify/functions/verify-login',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({challengeId:pendingLoginChallenge,code})});
+    const data=await res.json();
+    if(!res.ok){errEl.textContent='❌ '+(data.error||'Помилка');btn.disabled=false;btn.textContent='Підтвердити вхід';return;}
+    pendingLoginChallenge=''; onAuthSuccess(data);
+  }catch{errEl.textContent='❌ Проблема з мережею, спробуй ще раз';btn.disabled=false;btn.textContent='Підтвердити вхід';}
 }
 
 function togglePassword(id,btn){
@@ -1655,7 +1743,7 @@ async function submitRegisterVerify(){
   try{
     const res=await fetch('/.netlify/functions/register',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({action:'verify',email:pendingRegEmail,code})
+      body:JSON.stringify({action:'verify',email:pendingRegEmail,code,deviceId:getDeviceId()})
     });
     const data=await res.json();
     btn.disabled=false;btn.textContent='Підтвердити';
@@ -1733,13 +1821,12 @@ function closeEmailSetup(){
 }
 
 async function checkEmailSetup(){
-  const token=localStorage.getItem('ts_token');
-  if(!token)return;
+  if(localStorage.getItem('ts_authed')!=='1')return;
 
   try{
     const res=await fetch('/.netlify/functions/account-email',{
       method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      headers:{'Content-Type':'application/json','X-TS-Device-ID':getDeviceId()},
       body:JSON.stringify({action:'status'})
     });
     const data=await res.json();
@@ -1768,10 +1855,10 @@ async function requestAccountEmail(){
   btn.disabled=true;btn.textContent='Надсилаємо...';
 
   try{
-    const token=localStorage.getItem('ts_token');
+    const token='';
     const res=await fetch('/.netlify/functions/account-email',{
       method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      headers:{'Content-Type':'application/json','X-TS-Device-ID':getDeviceId()},
       body:JSON.stringify({action:'request',email})
     });
     const data=await res.json();
@@ -1799,10 +1886,10 @@ async function verifyAccountEmail(){
   btn.disabled=true;btn.textContent='Перевіряємо...';
 
   try{
-    const token=localStorage.getItem('ts_token');
+    const token='';
     const res=await fetch('/.netlify/functions/account-email',{
       method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      headers:{'Content-Type':'application/json','X-TS-Device-ID':getDeviceId()},
       body:JSON.stringify({action:'verify',code})
     });
     const data=await res.json();
@@ -1820,12 +1907,11 @@ async function verifyAccountEmail(){
 
 
 async function checkAdminRole(){
-  const token=localStorage.getItem('ts_token');
-  if(!token)return;
+  if(localStorage.getItem('ts_authed')!=='1')return;
   try{
     const res=await fetch('/.netlify/functions/admin',{
       method:'POST',
-      headers:{'Content-Type':'application/json','Authorization':'Bearer '+token},
+      headers:{'Content-Type':'application/json','X-TS-Device-ID':getDeviceId()},
       body:JSON.stringify({action:'my-role'})
     });
     localStorage.setItem('ts_is_admin',res.ok?'1':'0');
@@ -1868,11 +1954,10 @@ function showAccountBlocked(message, title='🔒 Акаунт заблокова
 }
 
 async function checkSessionStatus(){
-  const token=localStorage.getItem('ts_token');
-  if(!token)return;
+  if(localStorage.getItem('ts_authed')!=='1')return;
   try{
     const res=await fetch('/.netlify/functions/session-status',{
-      headers:{'Authorization':'Bearer '+token,'Cache-Control':'no-cache'},
+      headers:{'Cache-Control':'no-cache'},
       cache:'no-store'
     });
     const data=await res.json().catch(()=>({}));
@@ -1892,11 +1977,43 @@ async function checkSessionStatus(){
   }catch{}
 }
 
+async function openSessionsManager(){
+  const old=document.getElementById('sessions-modal-overlay'); if(old) old.remove();
+  const o=document.createElement('div'); o.id='sessions-modal-overlay'; o.className='modal-overlay';
+  o.innerHTML=`<div class="modal-card" style="max-width:720px;width:calc(100% - 24px)">
+    <div class="modal-head"><div class="modal-title">Активні сесії</div><button class="modal-close" onclick="document.getElementById('sessions-modal-overlay').remove()">×</button></div>
+    <div id="sessions-body" style="max-height:60vh;overflow:auto;padding:4px 0">Завантаження...</div>
+    <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap"><button class="savebtn" style="background:var(--danger)" onclick="revokeOtherSessions()">Завершити всі інші сесії</button><button class="savebtn" onclick="document.getElementById('sessions-modal-overlay').remove()">Закрити</button></div>
+  </div>`;
+  document.body.appendChild(o);
+  await loadSessionsManager();
+}
+function sessionDate(v){try{return new Date(Number(v)).toLocaleString('uk-UA')}catch{return '—'}}
+function renderSessionRows(data){
+  const body=document.getElementById('sessions-body'); if(!body)return;
+  if(!data.sessions?.length){body.innerHTML='<div style="padding:20px;text-align:center;color:var(--text2)">Активних сесій немає</div>';return;}
+  body.innerHTML=data.sessions.map(x=>{const d=x.device||{};return `<div style="border:1px solid var(--border);border-radius:14px;padding:12px;margin-bottom:8px;background:var(--bg3)">
+    <div style="display:flex;justify-content:space-between;gap:10px;align-items:flex-start"><div><b>${x.current?'🟢 Поточна сесія':'🔵 Активна сесія'}</b><div style="color:var(--text2);font-size:12px;margin-top:4px">${esc(d.type||'Пристрій')} · ${esc(d.os||'')} · ${esc(d.browser||'')}</div></div>${x.current?'<span style="font-size:11px;color:var(--success);font-weight:800">ЦЕЙ ПРИСТРІЙ</span>':`<button class="savebtn" style="background:var(--danger);padding:6px 10px" onclick="revokeOneSession('${esc(x.sessionId)}')">Завершити</button>`}</div>
+    <div style="font-size:11px;color:var(--text3);margin-top:9px;line-height:1.7">IP: ${esc(x.ip||'—')} · Остання активність: ${sessionDate(x.lastActive)}<br>Авторизація: ${sessionDate(x.createdAt)} · Зміни IP: ${Number(x.ipChanges||0)} · До: ${sessionDate(x.expiresAt)}</div>
+  </div>`}).join('');
+}
+async function loadSessionsManager(){
+  const body=document.getElementById('sessions-body'); if(!body)return;
+  try{const r=await fetch('/.netlify/functions/session-management',{cache:'no-store'});const d=await r.json();if(!r.ok)throw new Error(d.error||'Не вдалося отримати сесії');renderSessionRows(d);}catch(e){body.innerHTML='<div style="padding:20px;color:var(--danger)">❌ '+esc(e.message)+'</div>';}
+}
+async function revokeOneSession(id){
+  if(!confirm('Завершити цю сесію?'))return;
+  try{const r=await fetch('/.netlify/functions/session-management',{method:'POST',headers:{'Content-Type':'application/json','X-TS-Device-ID':getDeviceId()},body:JSON.stringify({action:'revoke',sessionId:id})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Помилка');await loadSessionsManager();}catch(e){alert('❌ '+e.message)}
+}
+async function revokeOtherSessions(){
+  if(!confirm('Завершити всі інші сесії цього акаунта? Поточна залишиться активною.'))return;
+  try{const r=await fetch('/.netlify/functions/session-management',{method:'POST',headers:{'Content-Type':'application/json','X-TS-Device-ID':getDeviceId()},body:JSON.stringify({action:'revoke-others'})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Помилка');alert('✅ Завершено сесій: '+Number(d.count||0));await loadSessionsManager();}catch(e){alert('❌ '+e.message)}
+}
+
 function logoutAccount(){
   if(!confirm('Вийти з акаунту на цьому пристрої?'))return;
-  const token=localStorage.getItem('ts_token');
-  if(token){
-    fetch('/.netlify/functions/logout',{method:'POST',headers:{'Content-Type':'application/json','Authorization':'Bearer '+token}}).catch(()=>{});
+  if(localStorage.getItem('ts_authed')==='1'){
+    fetch('/.netlify/functions/logout',{method:'POST',headers:{'Content-Type':'application/json','X-TS-Device-ID':getDeviceId()}}).catch(()=>{});
   }
   localStorage.removeItem('ts_userid');
   localStorage.removeItem('ts_username');
@@ -1953,10 +2070,7 @@ async function initNotifications(silent=false){
   renderPushStatus();
 }
 
-function authHeaders(){
-  const token=localStorage.getItem('ts_token');
-  return token?{'Authorization':'Bearer '+token}:{};
-}
+function authHeaders(){ return localStorage.getItem('ts_authed')==='1'?{'X-TS-Device-ID':getDeviceId()}:{}; }
 
 async function subscribeToPush(){
   try{
@@ -1985,8 +2099,7 @@ let syncTimer=null;
 let pendingSyncAfterPull=false;
 function queueServerSync(immediate=false){
   if(applyingRemote){pendingSyncAfterPull=true;return;}
-  const token=localStorage.getItem('ts_token');
-  if(!token)return;
+  if(localStorage.getItem('ts_authed')!=='1')return;
   if(syncTimer)clearTimeout(syncTimer);
   const run=()=>fetch('/.netlify/functions/save-schedule',{
     method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},
@@ -1997,8 +2110,7 @@ function queueServerSync(immediate=false){
 }
 
 async function pullFromServer(){
-  const token=localStorage.getItem('ts_token');
-  if(!token)return;
+  if(localStorage.getItem('ts_authed')!=='1')return;
   try{
     const res=await fetch('/.netlify/functions/load-schedule',{headers:authHeaders()});
     if(!res.ok)return;

@@ -1,0 +1,77 @@
+TS_Daily v5 — consolidated fixes and polish
+
+WHAT THIS ZIP CONTAINS
+This is a FULL consolidated project based on the security/email version plus the latest ban/session/admin fixes. You can replace the project with this archive instead of applying multiple small patches.
+
+FIXES / FEATURES
+1. Automatic account unban
+- Temporary bans expire server-side.
+- Expired bans are cleaned automatically by a Netlify Scheduled Function every minute.
+- Login/session checks also lazily expire an old ban if needed.
+- Old revoked sessions stay revoked after an unban; the user must log in again.
+
+2. Ban/session correctness
+- Ban reason comes from the admin-entered text.
+- Account ban duration: 1 hour / 1 day / 7 days / forever.
+- Detailed Ukrainian ban dialog with reason, end time and countdown.
+- Existing sessions are revoked immediately.
+- IP bans remain separate and can have their own duration.
+
+3. Admin hierarchy
+- ADMIN_USERNAME is the protected master admin.
+- Master admin is shown as ГОЛОВНИЙ АДМІН.
+- Master can manage normal admins.
+- Normal admins cannot manage the master or other admins.
+- Server-side checks enforce this; UI is not the security boundary.
+- Admin panel now receives currentIsMaster correctly.
+
+4. Admin panel visual redesign
+- New security-center header.
+- Better stat cards, tabs, table hover states, modal styling and responsive layout.
+- Keeps existing user/session/IP/audit controls.
+
+5. Registration passwords
+- Registration now requires: Пароль + Повтори пароль.
+- Server also verifies the two passwords match.
+- Eye / crossed-eye buttons were added to login, registration and reset password fields.
+- Password length remains 8–128 characters server-side.
+
+6. Notes reminders
+- Local reminder fallback checks note deadlines every 30 seconds while the app is open.
+- Reminders: 24 hours, 3 hours, 1 hour, and overdue.
+- Notifications appear in the notification center and, when browser permission is granted, as browser notifications.
+- Existing server-side push reminder function is now scheduled automatically every minute through Netlify.
+- This requires the existing VAPID environment variables for push while the app is closed.
+
+7. Notification badge
+- Badge is positioned relative to the bell icon and centered inside its circle.
+- It no longer floats awkwardly above the header.
+
+8. Email branding
+- Email sender display name is now TS_Daily.
+- Email subjects use TS_Daily.
+- Email body includes TS_Daily branding.
+- Gmail credentials remain in Netlify environment variables; do not commit them to GitHub.
+
+SCHEDULED FUNCTIONS
+- cleanup-bans: every minute
+- scheduled-notifications: every minute
+These are configured in netlify.toml.
+
+IMPORTANT ENVIRONMENT VARIABLES FOR EMAIL/PUSH
+- GMAIL_USER
+- GMAIL_APP_PASSWORD
+- VAPID_PUBLIC_KEY
+- VAPID_PRIVATE_KEY
+- VAPID_SUBJECT (optional)
+- CRON_SECRET is optional; the scheduled wrapper passes it automatically if configured.
+
+
+V5.1.0 — Security & Account History
+- Додано журнал дій акаунта з входами, сесіями, email-запитами, змінами пароля та блокуваннями.
+- Додано деталі акаунта в адмін-панелі та захищене очищення історії з подвійним підтвердженням.
+- Додано зміну пароля з перевіркою старого пароля та завершенням старих сесій.
+- Додано сповіщення про новий пристрій і підтвердження нового входу через email.
+- Додано підтвердження кожного нового входу через email.
+- Зміна email адміністратором надсилає український лист із кодом підтвердження для звернення до адміністрації.
+- Після зміни/відновлення пароля список довірених пристроїв очищується.

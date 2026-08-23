@@ -1,0 +1,11 @@
+TS Розклад V5.2.4 — Session Binding + Admin Audit Context
+
+- Authenticated sessions are bound to the browser deviceId and User-Agent.
+- A stolen bearer token without the device identifier is rejected and the session is revoked.
+- User-Agent/device mismatch is recorded as session-security-rejected.
+- IP changes are recorded in the account activity log; IP changes do not automatically log users out because mobile networks and VPNs can rotate IPs.
+- Admin audit records now include administrator IP, device, User-Agent and a short session ID.
+- Critical admin actions continue to require the separate admin password + email 2FA.
+- Audit entries remain hash-chained.
+
+Important: this is not a replacement for HTTPS or HttpOnly/SameSite cookies. The current architecture uses a bearer token in the application. Device binding reduces replay risk but cannot protect against an attacker who steals both the token and the device identifier from the same browser storage.

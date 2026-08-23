@@ -1,0 +1,7 @@
+TS Розклад V5.2.6
+- CSP + security headers
+- менеджер активних сесій і пристроїв
+- завершення окремої сесії
+- завершення всіх інших сесій
+- непрямий sessionId без видачі токена клієнту
+- збережено HttpOnly cookie, device binding, IP history, admin security, email 2FA та emergency recovery
