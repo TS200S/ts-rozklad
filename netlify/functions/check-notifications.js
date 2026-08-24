@@ -13,6 +13,7 @@ const VAPID_PUBLIC = process.env.VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY;
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:example@example.com';
 const CRON_SECRET = process.env.CRON_SECRET; // optional shared secret
+const CURRENT_ORIGIN = String(process.env.URL || process.env.DEPLOY_PRIME_URL || '').replace(/\/$/, '');
 
 webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
 
@@ -41,7 +42,10 @@ function kyivParts() {
 // ever shared across users - every key it touches is namespaced by userId.
 async function processUser(s, userId, dayIdx, curMins, dateKey) {
   const data = await s.get(`schedule-data:${userId}`, { type: 'json' });
-  const subscriptions = (await s.get(`subscriptions:${userId}`, { type: 'json' })) || [];
+  const allSubscriptions = (await s.get(`subscriptions:${userId}`, { type: 'json' })) || [];
+  // Push subscriptions are origin-bound. Legacy entries without siteOrigin are
+  // intentionally ignored so an old Netlify site cannot receive new pushes.
+  const subscriptions = allSubscriptions.filter(sub => sub && sub.siteOrigin === CURRENT_ORIGIN);
 
   if (!data || !subscriptions.length) return { sent: 0 };
 

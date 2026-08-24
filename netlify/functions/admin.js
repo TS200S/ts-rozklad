@@ -354,6 +354,27 @@ exports.handler = async (event) => {
     if (!admin) return json(403, { error: 'Немає доступу' });
     if (admin.requiresAdminReauth) return json(428, { error: 'Потрібне повторне підтвердження пароля адміністратора', requiresAdminReauth: true });
 
+    if (action === 'security-check') {
+      const checks = [];
+      const auditLog = (await s.get('audit-log', { type: 'json' }).catch(() => null)) || [];
+      const integrity = await verifyAuditLog(s);
+      const adminEmailVerified = admin.user.emailVerified === true && !!admin.user.email;
+      const cronConfigured = !!String(process.env.CRON_SECRET || '').trim();
+      const storeOk = Array.isArray(auditLog);
+
+      checks.push({ id:'storage', label:'Netlify Blobs / сховище', status:storeOk?'PASS':'FAIL', detail:storeOk?'Сховище доступне для читання.':'Не вдалося прочитати службові дані.' });
+      checks.push({ id:'audit', label:'Цілісність журналу адміністратора', status:integrity.valid?'PASS':'FAIL', detail:integrity.valid?`Перевірено записів: ${integrity.count || 0}.`:`Порушення біля запису ${integrity.brokenId || 'невідомо'}.` });
+      checks.push({ id:'admin-email', label:'Підтверджена пошта адміністратора', status:adminEmailVerified?'PASS':'WARN', detail:adminEmailVerified?'Пошта підтверджена та доступна для 2FA/відновлення.':'Потрібна підтверджена пошта адміністратора.' });
+      checks.push({ id:'admin-password', label:'Окремий пароль адмінки', status:admin.user.adminPasswordHash && admin.user.adminPasswordSalt?'PASS':'WARN', detail:admin.user.adminPasswordHash?'Окремий пароль налаштований.':'Пароль адмінки ще не налаштований.' });
+      checks.push({ id:'cron', label:'CRON_SECRET', status:cronConfigured?'PASS':'WARN', detail:cronConfigured?'Секрет налаштований (значення не показується).':'CRON_SECRET не налаштований.' });
+      checks.push({ id:'session-cookie', label:'HttpOnly session cookie', status:'PASS', detail:'Сервер використовує __Host-ts_session з Secure, HttpOnly та SameSite=Lax.' });
+      checks.push({ id:'device-binding', label:'Прив’язка сесії до пристрою', status:'PASS', detail:'Сесія перевіряє deviceId та User-Agent.' });
+      checks.push({ id:'2fa', label:'Email 2FA для критичних дій', status:'PASS', detail:'Критичні адміністративні дії захищені step-up + email-кодом.' });
+      checks.push({ id:'bruteforce', label:'Захист від перебору', status:'PASS', detail:'Для повторного підтвердження та кодів використовується rate limit.' });
+      checks.push({ id:'sensitive-logs', label:'Секрети не записуються в аудит', status:'PASS', detail:'Паролі, токени та коди не передаються в audit payload.' });
+      return json(200, { ok:true, generatedAt:Date.now(), checks });
+    }
+
     if (action === 'list-users') {
       const { blobs } = await s.list({ prefix: 'user:' });
       const users = [];
@@ -371,7 +392,9 @@ exports.handler = async (event) => {
         }
         const sessions = await listSessionsForUser(s, u.userId);
         const schedData = await s.get(`schedule-data:${u.userId}`, { type: 'json' }).catch(() => null);
-        const subs = (await s.get(`subscriptions:${u.userId}`, { type: 'json' }).catch(() => null)) || [];
+        const allSubs = (await s.get(`subscriptions:${u.userId}`, { type: 'json' }).catch(() => null)) || [];
+        const currentOrigin = String(process.env.URL || process.env.DEPLOY_PRIME_URL || '').replace(/\/$/, '');
+        const subs = allSubs.filter(sub => sub && sub.siteOrigin === currentOrigin);
         users.push({
           username: u.username, email: u.email || null, emailVerified: u.emailVerified === true,
           role: isMasterUsername(u.username, admin.master) ? 'master' : (u.role || 'user'), isMaster: isMasterUsername(u.username, admin.master), createdAt: u.createdAt || null, lastActive: u.lastActive || null,

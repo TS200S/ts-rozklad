@@ -21,6 +21,7 @@ exports.handler = async (event) => {
 
     const body = JSON.parse(event.body || '{}');
     const { subscription, action } = body;
+    const currentOrigin = String(process.env.URL || process.env.DEPLOY_PRIME_URL || '').replace(/\/$/, '');
 
     if (!subscription || !subscription.endpoint) {
       return { statusCode: 400, body: JSON.stringify({ error: 'Немає підписки' }) };
@@ -34,7 +35,7 @@ exports.handler = async (event) => {
       updated = existing.filter(sub => sub.endpoint !== subscription.endpoint);
     } else {
       updated = existing.filter(sub => sub.endpoint !== subscription.endpoint);
-      updated.push(subscription);
+      updated.push({ ...subscription, siteOrigin: currentOrigin || null, savedAt: Date.now() });
     }
 
     await s.setJSON(key, updated);
