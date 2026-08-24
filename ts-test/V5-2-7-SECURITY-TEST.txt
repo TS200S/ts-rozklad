@@ -1,0 +1,13 @@
+V5.2.7 SECURITY TEST SUITE
+
+Added:
+- security-test.js
+- npm run security:test
+- SECURITY-TESTING.md
+- package version synchronized to 5.2.7
+
+Local automated result:
+15/15 tests passed
+SECURITY TEST: PASS
+
+During testing an actual bug was found in session validation: the IP variable was referenced outside its declaration scope for valid device-bound sessions. Fixed in lib/session.js and covered by the session validation test.
