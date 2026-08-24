@@ -2,7 +2,6 @@
 <html lang="uk">
 <head>
 <meta charset="UTF-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'self'; form-action 'self'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com data:; img-src 'self' data: blob: https:; connect-src 'self'; worker-src 'self' blob:; manifest-src 'self';">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>TS Розклад</title>
 <link rel="manifest" href="manifest.json">
@@ -1957,7 +1956,7 @@ async function checkSessionStatus(){
   if(localStorage.getItem('ts_authed')!=='1')return;
   try{
     const res=await fetch('/.netlify/functions/session-status',{
-      headers:{'Cache-Control':'no-cache'},
+      headers:{'Cache-Control':'no-cache',...authHeaders()},
       cache:'no-store'
     });
     const data=await res.json().catch(()=>({}));
@@ -1999,7 +1998,7 @@ function renderSessionRows(data){
 }
 async function loadSessionsManager(){
   const body=document.getElementById('sessions-body'); if(!body)return;
-  try{const r=await fetch('/.netlify/functions/session-management',{cache:'no-store'});const d=await r.json();if(!r.ok)throw new Error(d.error||'Не вдалося отримати сесії');renderSessionRows(d);}catch(e){body.innerHTML='<div style="padding:20px;color:var(--danger)">❌ '+esc(e.message)+'</div>';}
+  try{const r=await fetch('/.netlify/functions/session-management',{cache:'no-store',headers:authHeaders()});const d=await r.json();if(!r.ok)throw new Error(d.error||'Не вдалося отримати сесії');renderSessionRows(d);}catch(e){body.innerHTML='<div style="padding:20px;color:var(--danger)">❌ '+esc(e.message)+'</div>';}
 }
 async function revokeOneSession(id){
   if(!confirm('Завершити цю сесію?'))return;

@@ -1,0 +1,7 @@
+TS Розклад V5.2.11
+
+- Added Admin → Security Center with safe manual diagnostics.
+- Added server-side security-check diagnostics and client-side CSP/HTTPS/HttpOnly/Service Worker/session-cache checks.
+- Added push subscription origin binding so old Netlify origins are ignored.
+- Updated admin push subscription counts to current origin only.
+- No destructive security tests are run from the admin panel.

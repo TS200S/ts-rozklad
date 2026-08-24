@@ -1,0 +1,35 @@
+TS Розклад V5.2.9 — FIXES
+
+Виправлено критичні проблеми, знайдені під час реального браузерного тесту:
+
+1. Service Worker більше не перехоплює Netlify Functions/API або POST-запити.
+   Це прибирає ризик кешування/підміни персонального розкладу та проблем із Response/clone().
+
+2. Service Worker більше не перехоплює зовнішні ресурси, зокрема Google Fonts.
+   Це усуває помилки CSP connect-src для fonts.googleapis.com.
+
+3. HTML тепер не містить CSP через <meta>.
+   frame-ancestors та інші CSP-директиви віддаються Netlify як HTTP-заголовок.
+
+4. Виправлено session-status: клієнт тепер передає X-TS-Device-ID.
+   Раніше фоновий перевіряючий запит міг сам відхилити сесію через device binding і викинути користувача.
+
+5. Виправлено GET керування сесіями: також передається X-TS-Device-ID.
+
+6. load-schedule має Cache-Control: no-store.
+
+7. Service Worker оновлено до окремого cache version 5.2.9 та зроблено network-first для HTML.
+
+8. Папка ts-test очищена: у ній залишені тільки файли автоматичного security-тесту.
+
+9. Додані регресійні security-тести для Service Worker, CSP, device binding та no-store розкладу.
+
+Результат локальної автоматичної перевірки:
+19/19 PASS
+SECURITY TEST: PASS
+
+Додатково:
+- всі Netlify Functions проходять node --check;
+- inline JS у index.html, admin.html та admin-recovery.html проходить node --check.
+
+ВАЖЛИВО: після деплою потрібно один раз перевірити сайт у Chrome DevTools > Console/Network та пройти реальні сценарії входу, сесії, розкладу і 2FA.
