@@ -3,12 +3,12 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>TS Розклад</title>
+<title>TS_Daily</title>
 <link rel="manifest" href="manifest.json">
 <meta name="theme-color" content="#2563eb">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="TS Розклад">
+<meta name="apple-mobile-web-app-title" content="TS_Daily">
 <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Exo+2:wght@400;500;600;700;800;900&family=Syne:wght@400;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 <script>
 if('serviceWorker' in navigator){
@@ -460,7 +460,14 @@ button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.t
 #account-block-overlay{position:fixed;inset:0;z-index:20000;background:rgba(0,0,0,.82);backdrop-filter:blur(10px);display:none;align-items:center;justify-content:center;padding:20px;}
 #account-block-box{max-width:430px;width:100%;padding:26px;border-radius:20px;background:var(--bg2);border:1px solid var(--border2);box-shadow:var(--shadow);text-align:center;}
 #account-block-box .bt{font-size:22px;font-weight:900;margin-bottom:8px}.account-block-msg{color:var(--text2);line-height:1.5;font-size:13px}
-.mail-notice{padding:11px 12px;margin:10px 0 12px;border:1px solid rgba(96,165,250,.25);background:rgba(37,99,235,.10);border-radius:11px;color:var(--text2);font-size:11px;line-height:1.45}.mail-notice b{color:var(--accent2)}</style>
+.mail-notice{padding:11px 12px;margin:10px 0 12px;border:1px solid rgba(96,165,250,.25);background:rgba(37,99,235,.10);border-radius:11px;color:var(--text2);font-size:11px;line-height:1.45}.mail-notice b{color:var(--accent2)}
+/* TS_Daily premium polish */
+.card,.sec-card,.sbar,.lec-card,.panel,.aitem-wrap,.ecard{transition:transform .22s ease,box-shadow .22s ease,border-color .22s ease,background .22s ease;}
+.card:hover,.sec-card:hover,.sbar:hover,.lec-card:hover{transform:translateY(-1px);box-shadow:0 14px 38px rgba(0,0,0,.16);}
+.btn-g,.btn-b,.btn-y,.savebtn,.addbtn,.mbsave,.mbcancel,.refresh,.tab-btn{transition:transform .16s ease,filter .16s ease,box-shadow .16s ease;}
+.btn-g:hover,.btn-b:hover,.btn-y:hover,.savebtn:hover,.addbtn:hover,.mbsave:hover,.refresh:hover{transform:translateY(-1px);filter:brightness(1.06);}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition:none!important}}
+</style>
 <style>
  .ban-modal{position:fixed;inset:0;width:100vw;height:100vh;z-index:999999;background:rgba(0,0,0,.82);backdrop-filter:blur(12px);display:none;align-items:center;justify-content:center;padding:20px;box-sizing:border-box}
 .ban-card{width:min(470px,calc(100vw - 40px));box-sizing:border-box;background:var(--bg2);border-radius:22px;padding:24px;box-shadow:0 24px 90px rgba(0,0,0,.65);position:relative}
@@ -487,8 +494,8 @@ button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.t
   <div class="splash-glow"></div>
   <div class="splash-particles"><span></span><span></span><span></span><span></span><span></span><span></span></div>
   <img src="icon-512.png" class="splash-logo" alt="TS">
-  <div class="splash-title">РОЗКЛАД</div>
-  <div class="splash-sub">TS · Навчальний планер</div>
+  <div class="splash-title">TS_DAILY</div>
+  <div class="splash-sub">Навчальний планер · premium edition</div>
   <div class="splash-bar-wrap"><div class="splash-bar"></div></div>
   <div class="splash-dim"></div>
   <div class="splash-curtain l"></div>
@@ -521,7 +528,7 @@ button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.t
 <div id="lock-screen">
   <div class="lock-box">
     <span class="lock-ico">🔐</span>
-    <div class="lock-title">TS Розклад</div>
+    <div class="lock-title">TS_Daily</div>
 
     <!-- LOGIN -->
     <div id="auth-view-login" class="auth-view">
@@ -553,6 +560,7 @@ button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.t
     <div id="auth-view-reg1" class="auth-view" style="display:none">
       <div class="lock-sub">Створи новий акаунт</div>
       <input class="lock-input" id="reg-username" type="text" placeholder="Логін" maxlength="24" autocomplete="username" autocapitalize="off">
+      <input class="lock-input" id="reg-nickname" type="text" placeholder="Нікнейм" maxlength="24" autocomplete="nickname">
       <div class="pass-wrap"><input class="lock-input" id="reg-password" type="password" placeholder="Пароль" maxlength="40" autocomplete="new-password"><button type="button" class="pass-eye" onclick="togglePassword('reg-password',this)" aria-label="Показати пароль"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
       <div class="pass-wrap"><input class="lock-input" id="reg-password-confirm" type="password" placeholder="Повтори пароль" maxlength="40" autocomplete="new-password"><button type="button" class="pass-eye" onclick="togglePassword('reg-password-confirm',this)" aria-label="Показати пароль"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
       <input class="lock-input" id="reg-email" type="email" placeholder="Email" autocomplete="email" style="margin-top:8px">
@@ -645,7 +653,7 @@ button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.t
   <div class="header-top">
     <div class="logo-area">
       <img src="icon-192.png" class="logo-img" alt="TS">
-      <div><div class="logo-sub">Навчальний планер</div><div class="logo-title">TS</div></div>
+      <div><div class="logo-sub">Навчальний планер</div><div class="logo-title">TS_Daily</div></div>
     </div>
     <div style="display:flex;align-items:flex-start;gap:10px">
       <div class="bell-wrap" style="margin-top:2px">
@@ -667,6 +675,7 @@ button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.t
     <button class="tab-btn" onclick="switchTab('lectures')"><svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17.5 19a4.5 4.5 0 0 0 0-9 6 6 0 0 0-11.4-1.5A4.5 4.5 0 0 0 6.5 19h11Z"/></svg><span>Лекції</span></button>
     <button class="tab-btn" onclick="switchTab('edit')"><svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z"/></svg><span>Редактор</span></button>
     <button class="tab-btn" onclick="switchTab('notes')"><svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="3" width="16" height="18" rx="2.5"/><path d="M8 8h8M8 12.5h8M8 17h5"/></svg><span>Нотатки</span></button>
+    <button class="tab-btn" onclick="switchTab('help')"><span class="tab-ico" style="font-size:16px">?</span><span>Довідка</span></button>
     <button class="tab-btn" onclick="switchTab('settings')"><svg class="tab-ico" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.6 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.6a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z"/></svg><span>Налаш.</span></button>
   </div>
 </div>
@@ -680,6 +689,7 @@ button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.t
   <div id="tab-lectures" class="hidden"></div>
   <div id="tab-edit" class="hidden"></div>
   <div id="tab-notes" class="hidden"></div>
+  <div id="tab-help" class="hidden"></div>
   <div id="tab-settings" class="hidden"></div>
 </div>
 
@@ -689,8 +699,10 @@ button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.t
     <div class="mhandle"></div>
     <div class="mtitle" id="mtitle">Нова пара</div>
     <div class="fw"><div class="fl">Предмет</div><select class="fsel" id="f-subj"></select></div>
+    <div class="fw"><div class="fl">Шаблон часу</div><select class="fsel" id="f-period" onchange="if(this.value!=='custom')applyPeriodToSlot()"><option value="custom">⏱️ Нестандартний час</option></select></div>
     <div class="fw"><div class="fl">Час початку</div><input class="fi" id="f-time" type="time" value="09:00"></div>
     <div class="fw"><div class="fl">Тривалість (хв)</div><input class="fi" id="f-dur" type="number" value="80" min="15" max="300"></div>
+    <div class="fw"><label style="display:flex;gap:8px;align-items:center;color:var(--text2);font-size:12px"><input id="f-oneoff" type="checkbox" onchange="document.getElementById('f-oneoff-date').disabled=!this.checked"> Одноразова пара</label><input class="fi" id="f-oneoff-date" type="date" disabled style="margin-top:7px"></div>
     <div class="fw"><div class="fl">Тип</div>
       <select class="fsel" id="f-type">
         <option value="lecture">📖 Лекція</option>
@@ -743,6 +755,7 @@ button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.t
     <div class="mtitle" id="notes-mtitle">Нова нотатка</div>
     <div class="fw"><div class="fl">Текст</div><textarea class="fi" id="nf-text" rows="3" placeholder="Що потрібно зробити..." style="resize:vertical;font-family:var(--font)"></textarea></div>
     <div class="fw"><div class="fl">Дедлайн (необов'язково)</div><input class="fi" id="nf-deadline" type="datetime-local"></div>
+    <div class="fw"><div class="fl">Файли</div><input class="fi" id="nf-files" type="file" multiple accept=".pdf,.txt,.jpg,.jpeg,.png,.webp,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip"><div id="nf-attachments" style="font-size:11px;color:var(--text3);margin-top:6px"></div></div>
     <div class="mbtns">
       <button class="mbdel hidden" id="notes-btn-del" onclick="deleteNote()"><svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2M6 7l1 13a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-13"/><path d="M10 11v6M14 11v6"/></svg></button>
       <button class="mbcancel" onclick="closeNotesModal()">Скасувати</button>
@@ -766,7 +779,7 @@ const DEF_SUBJECTS=[
   {id:'s3',name:'Програмування',teacher:'',link:'',gclass:'',color:'#8b5cf6'},
 ];
 const DEF_SCH={0:[{subjId:'s1',time:'08:30',duration:80,type:'lecture'},{subjId:'s3',time:'10:00',duration:80,type:'practice'}],1:[{subjId:'s2',time:'10:00',duration:80,type:'lecture'}],2:[{subjId:'s1',time:'08:30',duration:80,type:'seminar'},{subjId:'s2',time:'10:00',duration:80,type:'lab'}],3:[{subjId:'s3',time:'13:30',duration:80,type:'lecture'}],4:[{subjId:'s1',time:'08:30',duration:80,type:'practice'}],5:[],6:[]};
-const DEF_CFG={name:'Студенте',theme:'blue',font:'exo',time24:true,megaLink:'',notif10:true,notif5:true,glass:false,animBg:false,gradText:false,clockStyle:'minimal',clockSecs:false,tabAnim:'slide',bgPreset:'aurora'};
+const DEF_CFG={name:'Студенте',theme:'blue',font:'exo',time24:true,megaLink:'',notif10:true,notif5:true,glass:false,animBg:false,gradText:false,clockStyle:'minimal',clockSecs:false,tabAnim:'slide',bgPreset:'aurora',splashAnim:'neon',periods:[{n:1,start:'09:00',end:'10:00'},{n:2,start:'10:10',end:'11:10'},{n:3,start:'11:20',end:'12:20'},{n:4,start:'12:30',end:'13:30'},{n:5,start:'13:40',end:'14:40'},{n:6,start:'14:50',end:'15:50'}]};
 
 function load(k,def){try{const s=localStorage.getItem(k);return s?JSON.parse(s):JSON.parse(JSON.stringify(def));}catch{return JSON.parse(JSON.stringify(def));}}
 let schedule=load('ts_sch',DEF_SCH);
@@ -775,10 +788,12 @@ let cfg={...DEF_CFG,...load('ts_cfg',{})};
 let applyingRemote=false;
 let lastSyncedTs=Number(localStorage.getItem('ts_sync_ts')||0);
 let notes=load('ts_notes',[]);
+let oneOffLessons=load('ts_oneoff',[]);
 [5,6].forEach(d=>{if(!schedule[d])schedule[d]=[];});
 const saveS=()=>{localStorage.setItem('ts_sch',JSON.stringify(schedule));queueServerSync();};
 const saveSubjs=()=>{localStorage.setItem('ts_subjs',JSON.stringify(subjects));queueServerSync();};
 const saveNotes=()=>{localStorage.setItem('ts_notes',JSON.stringify(notes));queueServerSync();};
+const saveOneOff=()=>{localStorage.setItem('ts_oneoff',JSON.stringify(oneOffLessons));queueServerSync();};
 const saveCfg=()=>{localStorage.setItem('ts_cfg',JSON.stringify(cfg));queueServerSync();};
 
 let ctab='today',eday=0,eidx=null,editingSubjId=null,allView='days',selColor=COLORS[0];
@@ -881,7 +896,7 @@ setInterval(updateClock,1000);
 setInterval(()=>{if(ctab==='today')renderToday();},15000);
 
 // ===== TABS =====
-const ALL_TABS=['today','week','all','subjects','calendar','lectures','edit','notes','settings'];
+const ALL_TABS=['today','week','all','subjects','calendar','lectures','edit','notes','help','settings'];
 function switchTab(t){
   ctab=t;
   ALL_TABS.forEach(id=>document.getElementById('tab-'+id).classList.toggle('hidden',id!==t));
@@ -897,8 +912,11 @@ function render(){
   else if(ctab==='lectures')renderLec();
   else if(ctab==='edit')renderEdit();
   else if(ctab==='notes')renderNotes();
+  else if(ctab==='help')renderHelp();
   else if(ctab==='settings'){renderCfg();setTimeout(loadSecuritySettings,0);}
 }
+
+function renderHelp(){document.getElementById('tab-help').innerHTML=`<div class="card" style="padding:18px"><div style="font-size:10px;letter-spacing:2px;color:var(--text4);font-weight:800;text-transform:uppercase">TS_Daily</div><h2 style="margin:5px 0 14px">📖 Довідка користувача</h2><div style="display:grid;gap:8px">${[['📅 Розклад','Вкладка «Сьогодні» показує поточну пару, перерву та наступне заняття. У «Тиждень» видно весь тижневий графік.'],['🔔 Сповіщення','Увімкни Push у налаштуваннях. Для надійної доставки браузер має дозволити сповіщення.'],['📎 Нотатки','Створюй нотатки, додавай дедлайни та приватні файли. Файли доступні лише власнику.'],['🔐 Безпека','У налаштуваннях можна змінити пароль, переглянути активні сесії та завершити доступ на інших пристроях.'],['🕐 Нестандартний час','При додаванні пари можна вибрати готовий період або вказати власний час.'],['➕ Одноразова пара','Одноразове заняття прив’язується до конкретної дати та не стає частиною постійного тижневого розкладу.'],['❓ Потрібна допомога?','Якщо проблема не вирішується, звернися до адміністрації TS_Daily.']].map(([t,b])=>`<details style="background:var(--bg3);border:1px solid var(--border);border-radius:12px;padding:11px"><summary style="cursor:pointer;font-weight:800">${t}</summary><div style="font-size:12px;color:var(--text2);line-height:1.6;margin-top:8px">${b}</div></details>`).join('')}</div></div>`;}
 
 // ===== TODAY =====
 function dayProgress(slots,nm){
@@ -914,10 +932,10 @@ function dayProgress(slots,nm){
 function renderToday(){
   const {tot:nm}=now();
   const di=todayIdx();
-  const slots=schedule[di]||[];
+  const slots=[...(schedule[di]||[]),...oneOffLessons.filter(x=>x.date===new Date().toISOString().slice(0,10))].sort((a,b)=>t2m(a.time)-t2m(b.time));
   const cur=slots.find(sl=>stat(sl,nm)==='on');
   const nxt=slots.find(sl=>stat(sl,nm)==='up');
-  const name=cfg.name||'Студенте';
+  const name=cfg.name||localStorage.getItem('ts_nickname')||'Студенте';
   let h='';
 
   if(cur){
@@ -996,7 +1014,7 @@ function renderWeek(){
   DAYS.forEach((day,dayI)=>{
     const isT=di===dayI,wknd=isWeekend(dayI);
     h+=`<div class="dhdr"><div class="ddot ${isT?'t':''}"></div><div class="dname ${isT?'t':''} ${wknd&&!isT?'weekend':''}">${day}${wknd?' 🌴':''}</div></div>`;
-    const slots=schedule[dayI]||[];
+    const slots=[...(schedule[dayI]||[]),...oneOffLessons.filter(x=>{const d=new Date(); const js=dayI<5?dayI+1:dayI===5?6:0; const diff=(js-d.getDay()+7)%7; const dd=new Date(d); dd.setDate(d.getDate()+diff); return x.date===dd.toISOString().slice(0,10);})].sort((a,b)=>t2m(a.time)-t2m(b.time));
     if(!slots.length){h+=`<div style="font-size:12px;color:var(--text4);padding-left:15px;margin-bottom:8px;font-weight:600">${wknd?'Вихідний':'Пар немає'}</div>`;}
     else slots.forEach((sl,i)=>{
       const subj=getSubj(sl.subjId),isDone=isT&&stat(sl,nm)==='done';
@@ -1254,14 +1272,19 @@ function renderEdit(){
     h+=`<div class="ecard"><div style="width:8px;height:8px;border-radius:50%;background:${subj.color};flex-shrink:0"></div><div class="einfo"><div class="ename">${esc(subj.name)}</div><div class="esub">${m2t(t2m(sl.time))} · ${sl.duration} хв · ${typeIcon(sl.type)} ${TYPE_LABELS[sl.type||'other']}</div></div><button class="ibtn" style="color:var(--accent2)" onclick="openEditSlot(${eday},${li})">${ico('edit3',15)}</button><button class="ibtn" style="color:var(--danger)" onclick="qDelSlot(${eday},${li})">${ico('trash',15)}</button></div>`;
   });
   h+=`<button class="addbtn" onclick="openAddSlot(${eday})">+ Додати пару</button>`;
+  const todayStr=new Date().toISOString().slice(0,10); const oo=oneOffLessons.filter(x=>x.date>=todayStr);
+  if(oo.length) h+=`<div style="font-size:10px;letter-spacing:2px;color:var(--text4);font-weight:800;text-transform:uppercase;margin:18px 0 9px">Одноразові пари</div>`+oo.map(x=>{const sub=getSubj(x.subjId);return `<div class="ecard"><div style="width:8px;height:8px;border-radius:50%;background:var(--warn);flex-shrink:0"></div><div class="einfo"><div class="ename">${esc(sub.name)}</div><div class="esub">${esc(x.date)} · ${m2t(t2m(x.time))} · ${x.duration} хв</div></div><button class="ibtn" style="color:var(--danger)" onclick="deleteOneOff('${x.id}')">${ico('trash',15)}</button></div>`}).join('');
   document.getElementById('tab-edit').innerHTML=h;
 }
 function setEday(i){eday=i;renderEdit();}
+function deleteOneOff(id){if(!confirm('Видалити одноразову пару?'))return;oneOffLessons=oneOffLessons.filter(x=>x.id!==id);saveOneOff();renderEdit();sendScheduleToSW();}
 function buildSubjSel(selId){const s=document.getElementById('f-subj');s.innerHTML=subjects.map(s=>`<option value="${s.id}" ${s.id===selId?'selected':''}>${esc(s.name)}</option>`).join('');}
-function openAddSlot(di){eday=di;eidx=null;document.getElementById('mtitle').textContent='Нова пара';document.getElementById('btn-del').classList.add('hidden');buildSubjSel(subjects[0]?.id||'');document.getElementById('f-time').value='09:00';document.getElementById('f-dur').value='80';document.getElementById('f-type').value='lecture';document.getElementById('modal-overlay').classList.remove('hidden');}
-function openEditSlot(di,li){eday=di;eidx=li;const sl=schedule[di][li];document.getElementById('mtitle').textContent='Редагувати пару';document.getElementById('btn-del').classList.remove('hidden');buildSubjSel(sl.subjId);document.getElementById('f-time').value=sl.time||'09:00';document.getElementById('f-dur').value=sl.duration||80;document.getElementById('f-type').value=sl.type||'lecture';document.getElementById('modal-overlay').classList.remove('hidden');}
+function populatePeriodOptions(){const el=document.getElementById('f-period');if(!el)return;el.innerHTML='<option value="custom">⏱️ Нестандартний час</option>'+(cfg.periods||[]).map(p=>`<option value="${p.n}">${p.n} пара · ${p.start}–${p.end}</option>`).join('');}
+function applyPeriodToSlot(){const p=cfg.periods?.find(x=>String(x.n)===document.getElementById('f-period')?.value);if(!p)return;document.getElementById('f-time').value=p.start;document.getElementById('f-dur').value=Math.max(15,t2m(p.end)-t2m(p.start));}
+function openAddSlot(di){eday=di;eidx=null;document.getElementById('mtitle').textContent='Нова пара';document.getElementById('btn-del').classList.add('hidden');buildSubjSel(subjects[0]?.id||'');populatePeriodOptions();document.getElementById('f-period').value='custom';document.getElementById('f-time').value='09:00';document.getElementById('f-dur').value='60';document.getElementById('f-type').value='lecture';document.getElementById('f-oneoff').checked=false;document.getElementById('f-oneoff-date').value='';document.getElementById('modal-overlay').classList.remove('hidden');}
+function openEditSlot(di,li){eday=di;eidx=li;const sl=schedule[di][li];document.getElementById('mtitle').textContent='Редагувати пару';document.getElementById('btn-del').classList.remove('hidden');buildSubjSel(sl.subjId);populatePeriodOptions();document.getElementById('f-period').value='custom';document.getElementById('f-time').value=sl.time||'09:00';document.getElementById('f-dur').value=sl.duration||80;document.getElementById('f-type').value=sl.type||'lecture';document.getElementById('f-oneoff').checked=false;document.getElementById('f-oneoff-date').value='';document.getElementById('modal-overlay').classList.remove('hidden');}
 function closeModal(){document.getElementById('modal-overlay').classList.add('hidden');}
-function saveSlot(){const subjId=document.getElementById('f-subj').value,time=document.getElementById('f-time').value;if(!subjId||!time){alert('Вибери предмет та час!');return;}const sl={subjId,time,duration:parseInt(document.getElementById('f-dur').value)||80,type:document.getElementById('f-type').value||'lecture'};const day=[...(schedule[eday]||[])];if(eidx!==null)day[eidx]=sl;else day.push(sl);day.sort((a,b)=>t2m(a.time)-t2m(b.time));schedule[eday]=day;saveS();closeModal();render();sendScheduleToSW();showSavedBanner();}
+function saveSlot(){const subjId=document.getElementById('f-subj').value,time=document.getElementById('f-time').value;const oneoff=document.getElementById('f-oneoff').checked,date=document.getElementById('f-oneoff-date').value;if(!subjId||!time){alert('Вибери предмет та час!');return;}if(oneoff&&!date){alert('Вкажи дату одноразової пари.');return;}const sl={subjId,time,duration:Math.min(300,Math.max(15,parseInt(document.getElementById('f-dur').value)||60)),type:document.getElementById('f-type').value||'lecture'};if(oneoff){oneOffLessons.push({...sl,id:genId(),date});oneOffLessons.sort((a,b)=>(a.date+a.time).localeCompare(b.date+b.time));saveOneOff();}else{const day=[...(schedule[eday]||[])];if(eidx!==null)day[eidx]=sl;else day.push(sl);day.sort((a,b)=>t2m(a.time)-t2m(b.time));schedule[eday]=day;saveS();}closeModal();render();sendScheduleToSW();showSavedBanner();}
 function deleteSlot(){if(eidx===null)return;const day=[...(schedule[eday]||[])];day.splice(eidx,1);schedule[eday]=day;saveS();closeModal();render();sendScheduleToSW();}
 function qDelSlot(di,li){if(!confirm('Видалити пару?'))return;const day=[...(schedule[di]||[])];day.splice(li,1);schedule[di]=day;saveS();renderEdit();sendScheduleToSW();}
 function showSavedBanner(){const b=document.getElementById('update-banner');b.querySelector('.update-text').innerHTML='💾 <b>Розклад оновлено!</b> Рекомендуємо зробити резервну копію';const btn=b.querySelector('.update-btn');btn.textContent='📤 Експорт';btn.onclick=()=>{exportData();b.style.display='none';};b.style.display='block';}
@@ -1328,6 +1351,7 @@ function openAddNote(){
   document.getElementById('notes-btn-del').classList.add('hidden');
   document.getElementById('nf-text').value='';
   document.getElementById('nf-deadline').value='';
+  document.getElementById('nf-files').value=''; document.getElementById('nf-attachments').innerHTML='';
   document.getElementById('notes-modal-overlay').classList.remove('hidden');
 }
 function openEditNote(id){
@@ -1338,6 +1362,7 @@ function openEditNote(id){
   document.getElementById('notes-btn-del').classList.remove('hidden');
   document.getElementById('nf-text').value=n.text;
   document.getElementById('nf-deadline').value=n.deadline||'';
+  document.getElementById('nf-files').value=''; document.getElementById('nf-attachments').innerHTML=(n.attachments||[]).map(a=>`<div>📎 ${esc(a.name)} <button onclick="event.preventDefault();deleteNoteFile('${n.id}','${a.id}')" style="border:0;background:none;color:var(--danger);cursor:pointer">видалити</button></div>`).join('');
   document.getElementById('notes-modal-overlay').classList.remove('hidden');
 }
 function closeNotesModal(){document.getElementById('notes-modal-overlay').classList.add('hidden');}
@@ -1377,9 +1402,14 @@ function saveNote(){
     notes.unshift({id:'n'+Date.now(),text,deadline,done:false,createdAt:Date.now()});
   }
   saveNotes();
+  const selected=[...(document.getElementById('nf-files')?.files||[])];
   closeNotesModal();
   renderNotes(); checkNoteReminders();
+  if(selected.length && editingNoteId) uploadNoteFiles(editingNoteId,selected); else if(selected.length){const id=notes[0]?.id;if(id)uploadNoteFiles(id,selected);}
 }
+async function uploadNoteFiles(noteId,files){for(const f of files){if(f.size>4*1024*1024){alert('❌ '+f.name+': максимум 4 МБ');continue;}try{const r=await fetch('/.netlify/functions/note-files-upload?noteId='+encodeURIComponent(noteId),{method:'POST',headers:{...authHeaders(),'Content-Type':f.type||'application/octet-stream','X-File-Name':encodeURIComponent(f.name)},body:f});const d=await r.json();if(!r.ok)throw new Error(d.error||'Помилка');const n=notes.find(x=>x.id===noteId);if(n){n.attachments=Array.isArray(n.attachments)?n.attachments:[];n.attachments.push(d.file);saveNotes();renderNotes();}}catch(e){alert('❌ '+f.name+': '+e.message)}}}
+async function openNoteFile(noteId,fileId){const n=notes.find(x=>x.id===noteId);if(!n||(n.attachments||[]).every(a=>a.id!==fileId))return;window.open('/.netlify/functions/note-files-get?id='+encodeURIComponent(fileId),'_blank','noopener');}
+async function deleteNoteFile(noteId,fileId){if(!confirm('Видалити файл із сервера? Дію не можна скасувати.'))return;try{const r=await fetch('/.netlify/functions/note-files-delete',{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({id:fileId})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Помилка');const n=notes.find(x=>x.id===noteId);if(n)n.attachments=(n.attachments||[]).filter(a=>a.id!==fileId);saveNotes();renderNotes();if(editingNoteId===noteId)openEditNote(noteId);}catch(e){alert('❌ '+e.message)}}
 function deleteNote(){
   if(!editingNoteId)return;
   notes=notes.filter(x=>x.id!==editingNoteId);
@@ -1502,6 +1532,8 @@ function renderCfg(){
       </div>
     </div></div>
   </div>
+  <div class="sec-title">Часи пар</div>
+  <div class="sec-card"><div class="sec-row"><div class="sec-ico">${ico('clock')}</div><div class="sec-info"><div class="sec-label">Вбудовані періоди</div><div class="sec-sub">Використовуй шаблони при додаванні пар або залишай нестандартний час.</div><div id="period-editor" style="display:grid;gap:7px;margin-top:10px">${(cfg.periods||[]).map((p,i)=>`<div style="display:grid;grid-template-columns:38px 1fr 1fr auto;gap:6px;align-items:center"><b style="font-size:11px">${p.n}</b><input class="sec-input" type="time" value="${p.start}" onchange="setPeriod(${i},'start',this.value)"><input class="sec-input" type="time" value="${p.end}" onchange="setPeriod(${i},'end',this.value)"><button class="vtbtn" onclick="removePeriod(${i})">✕</button></div>`).join('')}</div><button class="vtbtn" style="margin-top:9px" onclick="addPeriod()">+ Додати період</button></div></div></div>
   <div class="sec-title">Візуальні ефекти</div>
   <div class="sec-card">
     <div class="sec-row"><div class="sec-ico">${ico('layers')}</div><div class="sec-info"><div class="sec-label">Glassmorphism</div><div class="sec-sub">Скляні розмиті картки</div>
@@ -1540,6 +1572,7 @@ function renderCfg(){
     <button class="savebtn" style="margin-top:9px" onclick="openSessionsManager()">${ico('monitor',16)} Активні сесії та пристрої</button>
     <button class="savebtn" style="margin-top:9px;background:var(--danger)" onclick="logoutAccount()">${ico('lock',16)} Вийти з акаунту</button>
   </div></div></div>
+  <div class="sec-title">Сховище</div><div class="sec-card"><div class="sec-row" style="cursor:pointer" onclick="switchTab('notes')"><div class="sec-ico">📎</div><div class="sec-info"><div class="sec-label">Вкладення в нотатках</div><div class="sec-sub">Файли до 4 МБ · безпечний приватний доступ</div></div></div></div>
   <div class="sec-title">Синхронізація</div>
   <div class="sec-card">
     <div class="sec-row" style="cursor:pointer" onclick="exportData()"><div class="sec-ico">${ico('upload')}</div><div class="sec-info"><div class="sec-label">Експорт JSON</div><div class="sec-sub">Резервна копія розкладу</div></div></div>
@@ -1558,6 +1591,9 @@ function renderCfg(){
   const adminBtn=document.getElementById('admin-panel-btn');
   if(adminBtn)adminBtn.style.display=localStorage.getItem('ts_is_admin')==='1'?'block':'none';
 }
+function setPeriod(i,k,v){if(!cfg.periods)cfg.periods=[];if(cfg.periods[i]){cfg.periods[i][k]=v;saveCfg();}}
+function addPeriod(){const n=(cfg.periods?.length||0)+1;cfg.periods=[...(cfg.periods||[]),{n,start:'09:00',end:'10:00'}];saveCfg();renderCfg();}
+function removePeriod(i){if(!confirm('Видалити цей період?'))return;cfg.periods=(cfg.periods||[]).filter((_,x)=>x!==i).map((p,x)=>({...p,n:x+1}));saveCfg();renderCfg();}
 async function loadSecuritySettings(){
   if(localStorage.getItem('ts_authed')!=='1')return;
   try{const r=await fetch('/.netlify/functions/update-security',{method:'POST',headers:{'Content-Type':'application/json','X-TS-Device-ID':getDeviceId()},body:JSON.stringify({action:'status'})});const d=await r.json();if(!r.ok)return;
@@ -1584,7 +1620,7 @@ async function submitPasswordChange(){
   const btn=document.getElementById('pw-save');btn.disabled=true;btn.textContent='Змінюємо...';
   try{const r=await fetch('/.netlify/functions/change-password',{method:'POST',headers:{'Content-Type':'application/json','X-TS-Device-ID':getDeviceId()},body:JSON.stringify({currentPassword,newPassword,confirmPassword})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Помилка');alert('Пароль змінено. Для безпеки всі старі сесії завершено. Увійди знову.');closePasswordChange();logoutAccountSilent();}catch(e){err.textContent='❌ '+e.message;btn.disabled=false;btn.textContent='Змінити пароль';}
 }
-function logoutAccountSilent(){['ts_userid','ts_username','ts_token','ts_authed','ts_email','ts_is_admin'].forEach(k=>localStorage.removeItem(k));location.reload();}
+function logoutAccountSilent(){['ts_userid','ts_username','ts_nickname','ts_token','ts_authed','ts_email','ts_is_admin'].forEach(k=>localStorage.removeItem(k));location.reload();}
 
 function setTheme(t){cfg.theme=t;saveCfg();applyTheme();renderCfg();}
 function setFont(f){cfg.font=f;saveCfg();applyTheme();renderCfg();}
@@ -1627,6 +1663,7 @@ function startSessionWatcher(){
 function onAuthSuccess(data){
   localStorage.setItem('ts_userid',data.userId);
   localStorage.setItem('ts_username',data.username);
+  if(data.nickname)localStorage.setItem('ts_nickname',data.nickname);
   localStorage.removeItem('ts_token');
   localStorage.setItem('ts_authed','1');
   if(data.email) localStorage.setItem('ts_email',data.email); else localStorage.removeItem('ts_email');
@@ -1704,19 +1741,20 @@ function togglePassword(id,btn){
 let pendingRegEmail='';
 async function submitRegisterRequest(){
   const username=document.getElementById('reg-username').value.trim();
+  const nickname=document.getElementById('reg-nickname').value.trim();
   const password=document.getElementById('reg-password').value;
   const confirmPassword=document.getElementById('reg-password-confirm').value;
   const email=document.getElementById('reg-email').value.trim();
   const errEl=document.getElementById('reg1-err');
   errEl.textContent='';
-  if(!username||!password||!confirmPassword||!email){errEl.textContent='❌ Заповни всі поля';return;}
+  if(!username||!nickname||!password||!confirmPassword||!email){errEl.textContent='❌ Заповни всі поля';return;}
   if(password!==confirmPassword){errEl.textContent='❌ Паролі не збігаються';return;}
   const btn=document.getElementById('reg-submit-btn');
   btn.disabled=true;btn.textContent='Зачекай...';
   try{
     const res=await fetch('/.netlify/functions/register',{
       method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({action:'request',username,password,confirmPassword,email})
+      body:JSON.stringify({action:'request',username,nickname,password,confirmPassword,email})
     });
     const data=await res.json();
     btn.disabled=false;btn.textContent='Надіслати код на пошту';
@@ -1936,7 +1974,7 @@ function closeBanModal(){
   forceLocalLogout();
 }
 function clearLocalAuth(){
-  localStorage.removeItem('ts_userid');localStorage.removeItem('ts_username');localStorage.removeItem('ts_token');
+  localStorage.removeItem('ts_userid');localStorage.removeItem('ts_username');localStorage.removeItem('ts_nickname');localStorage.removeItem('ts_token');
   localStorage.removeItem('ts_authed');localStorage.removeItem('ts_email');localStorage.removeItem('ts_is_admin');
 }
 function forceLocalLogout(){
@@ -2102,8 +2140,8 @@ function queueServerSync(immediate=false){
   if(syncTimer)clearTimeout(syncTimer);
   const run=()=>fetch('/.netlify/functions/save-schedule',{
     method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},
-    body:JSON.stringify({schedule,subjects,cfg,notes})
-  }).then(()=>{lastSyncedTs=Date.now();localStorage.setItem('ts_sync_ts',String(lastSyncedTs));})
+    body:JSON.stringify({schedule,subjects,cfg,notes,oneOffLessons,baseUpdatedAt:lastSyncedTs})
+  }).then(async res=>{ if(res.status===409){ await pullFromServer(); return; } if(!res.ok) throw new Error('sync '+res.status); const out=await res.json().catch(()=>({})); lastSyncedTs=Number(out.updatedAt||Date.now()); localStorage.setItem('ts_sync_ts',String(lastSyncedTs)); })
     .catch(err=>console.error('Server sync failed',err));
   if(immediate)run();else syncTimer=setTimeout(run,1500);
 }
@@ -2120,6 +2158,8 @@ async function pullFromServer(){
     schedule=data.schedule||schedule;
     subjects=data.subjects||subjects;
     notes=data.notes||notes;
+    oneOffLessons=Array.isArray(data.oneOffLessons)?data.oneOffLessons:oneOffLessons;
+    localStorage.setItem('ts_oneoff',JSON.stringify(oneOffLessons));
     cfg={...cfg,notif10:data.notif10!==false,notif5:data.notif5!==false};
     localStorage.setItem('ts_sch',JSON.stringify(schedule));
     localStorage.setItem('ts_subjs',JSON.stringify(subjects));

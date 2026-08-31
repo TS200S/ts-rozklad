@@ -1,7 +1,7 @@
 {
-  "name": "TS Розклад",
-  "short_name": "TS",
-  "description": "Розклад пар — TS додаток",
+  "name": "TS_Daily",
+  "short_name": "TS_Daily",
+  "description": "TS_Daily — навчальний планер і розклад",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#080a10",

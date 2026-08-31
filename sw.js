@@ -1,4 +1,4 @@
-const CACHE = 'ts-rozklad-v5.2.9';
+const CACHE = 'ts-daily-v5.3.0';
 const STATIC_ASSETS = [
   '/',
   '/index.html',
