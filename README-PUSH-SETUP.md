@@ -1,6 +1,6 @@
-# Налаштування TS Розклад v6
+# Налаштування TS_Daily V5.3.8
 
-Версія 6 додає: email-реєстрацію з кодом підтвердження, відновлення паролю
+Актуальна версія 5.3.8: email-реєстрацію з кодом підтвердження, відновлення паролю
 через код на пошту, адмін-панель зі списком акаунтів, справжні сесійні
 токени (замість того, щоб довіряти "голому" userId), та кілька виправлень
 надійності сповіщень. Розділ нижче про push — без змін, все решта — нове.
@@ -97,14 +97,12 @@ Netlify → Site configuration → Environment variables → додай:
 
 ```
 VAPID_PUBLIC_KEY  = BOMVi7PS07KvuuGP7BuS9qGiW-GrdhxBuj5Q-hcDvQQSf-CXoXF7-RidvTr1YAe8jMD3p6ySgv3zqAldFrmSlvQ
-VAPID_PRIVATE_KEY = A-UkxlxlbsZ1ByyOojqzdDSGan6scBRoyZtHqJ8xN5o
+VAPID_PRIVATE_KEY = <встав свій VAPID private key з Netlify Environment Variables>
 VAPID_SUBJECT     = mailto:твоя_будь-яка@пошта.com
 CRON_SECRET       = придумай-будь-який-довгий-рядок-навмання
 ```
 
-`CRON_SECRET` — необов'язковий, але бажаний: без нього твою функцію
-`check-notifications` теоретично може смикати будь-хто в інтернеті, хто вгадає URL.
-З секретом — тільки той, хто знає рядок.
+`CRON_SECRET` — обов'язковий секрет для cron. Не передавай його в URL: query-параметри потрапляють у журнали. Використовуй власний HTTP-заголовок `X-Cron-Secret`.
 
 Після додавання змінних — зроби redeploy сайту (Netlify → Deploys → Trigger deploy),
 щоб функції їх підхопили.
@@ -113,8 +111,8 @@ CRON_SECRET       = придумай-будь-який-довгий-рядок-�
 
 1. Зареєструйся на https://cron-job.org (безкоштовно, email + пароль).
 2. Створи нову задачу (Create cronjob):
-   - **URL**: `https://ТВІЙ-САЙТ.netlify.app/.netlify/functions/check-notifications?secret=придумай-будь-який-довгий-рядок-навмання`
-     (той самий секрет, що в `CRON_SECRET`)
+   - **URL**: `https://ТВІЙ-САЙТ.netlify.app/.netlify/functions/check-notifications`
+   - **HTTP Header**: `X-Cron-Secret: <той самий секрет, що в CRON_SECRET>`
    - **Schedule**: кожну хвилину (`* * * * *`)
 3. Збережи. Готово — тепер щохвилини Netlify перевірятиме твій розклад і сама
    шле push, коли треба.

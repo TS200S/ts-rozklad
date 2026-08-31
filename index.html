@@ -1391,31 +1391,65 @@ async function checkNoteReminders(){
   }
 }
 
-function saveNote(){
+async function saveNote(){
   const text=document.getElementById('nf-text').value.trim();
   if(!text)return;
   const deadline=document.getElementById('nf-deadline').value||null;
-  if(editingNoteId){
-    const n=notes.find(x=>x.id===editingNoteId);
+  const selected=[...(document.getElementById('nf-files')?.files||[])];
+  let noteId=editingNoteId;
+  if(noteId){
+    const n=notes.find(x=>x.id===noteId);
     if(n){n.text=text;n.deadline=deadline;}
   } else {
-    notes.unshift({id:'n'+Date.now(),text,deadline,done:false,createdAt:Date.now()});
+    noteId='n'+Date.now()+'_'+Math.random().toString(36).slice(2,8);
+    notes.unshift({id:noteId,text,deadline,done:false,createdAt:Date.now(),attachments:[]});
   }
   saveNotes();
-  const selected=[...(document.getElementById('nf-files')?.files||[])];
   closeNotesModal();
   renderNotes(); checkNoteReminders();
-  if(selected.length && editingNoteId) uploadNoteFiles(editingNoteId,selected); else if(selected.length){const id=notes[0]?.id;if(id)uploadNoteFiles(id,selected);}
+  if(selected.length){
+    // A newly created note may only exist locally until the debounced sync runs.
+    // Flush the note to the server before uploading attachments, otherwise the
+    // upload endpoint correctly returns 404 because it cannot find the note.
+    try { await syncNotesNow(); }
+    catch (e) { alert('❌ Не вдалося зберегти нотатку перед завантаженням файлу: '+e.message); return; }
+    await uploadNoteFiles(noteId,selected);
+  }
+  editingNoteId=null;
 }
-async function uploadNoteFiles(noteId,files){for(const f of files){if(f.size>4*1024*1024){alert('❌ '+f.name+': максимум 4 МБ');continue;}try{const r=await fetch('/.netlify/functions/note-files-upload?noteId='+encodeURIComponent(noteId),{method:'POST',headers:{...authHeaders(),'Content-Type':f.type||'application/octet-stream','X-File-Name':encodeURIComponent(f.name)},body:f});const d=await r.json();if(!r.ok)throw new Error(d.error||'Помилка');const n=notes.find(x=>x.id===noteId);if(n){n.attachments=Array.isArray(n.attachments)?n.attachments:[];n.attachments.push(d.file);saveNotes();renderNotes();}}catch(e){alert('❌ '+f.name+': '+e.message)}}}
+async function uploadNoteFiles(noteId,files){
+  for(const f of files){
+    if(f.size>4*1024*1024){alert('❌ '+f.name+': максимум 4 МБ');continue;}
+    if(!f.type || !['application/pdf','text/plain','image/jpeg','image/png','image/webp','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.ms-powerpoint','application/vnd.openxmlformats-officedocument.presentationml.presentation','application/zip'].includes(f.type)){
+      alert('❌ '+f.name+': тип файлу не підтримується.'); continue;
+    }
+    try{
+      const r=await fetch('/.netlify/functions/note-files-upload?noteId='+encodeURIComponent(noteId),{method:'POST',headers:{...authHeaders(),'Content-Type':f.type,'X-File-Name':encodeURIComponent(f.name)},body:f});
+      const d=await r.json().catch(()=>({}));
+      if(!r.ok)throw new Error(d.error||('HTTP '+r.status));
+      const n=notes.find(x=>x.id===noteId);
+      if(n){n.attachments=Array.isArray(n.attachments)?n.attachments:[];n.attachments.push(d.file);saveNotes();renderNotes();}
+    }catch(e){alert('❌ '+f.name+': '+e.message)}
+  }
+}
 async function openNoteFile(noteId,fileId){const n=notes.find(x=>x.id===noteId);if(!n||(n.attachments||[]).every(a=>a.id!==fileId))return;window.open('/.netlify/functions/note-files-get?id='+encodeURIComponent(fileId),'_blank','noopener');}
 async function deleteNoteFile(noteId,fileId){if(!confirm('Видалити файл із сервера? Дію не можна скасувати.'))return;try{const r=await fetch('/.netlify/functions/note-files-delete',{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({id:fileId})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Помилка');const n=notes.find(x=>x.id===noteId);if(n)n.attachments=(n.attachments||[]).filter(a=>a.id!==fileId);saveNotes();renderNotes();if(editingNoteId===noteId)openEditNote(noteId);}catch(e){alert('❌ '+e.message)}}
-function deleteNote(){
+async function deleteNote(){
   if(!editingNoteId)return;
-  notes=notes.filter(x=>x.id!==editingNoteId);
-  saveNotes();
-  closeNotesModal();
-  renderNotes();
+  const noteId=editingNoteId;
+  if(!confirm('Видалити нотатку та всі прикріплені до неї файли з сервера?'))return;
+  try{
+    if(localStorage.getItem('ts_authed')==='1'){
+      await syncNotesNow();
+      const r=await fetch('/.netlify/functions/note-delete',{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({noteId})});
+      const d=await r.json().catch(()=>({}));
+      if(!r.ok)throw new Error(d.error||('HTTP '+r.status));
+    }
+    notes=notes.filter(x=>x.id!==noteId);
+    saveNotes();
+    closeNotesModal();
+    renderNotes();
+  }catch(e){alert('❌ Не вдалося видалити нотатку: '+e.message)}
 }
 function toggleNoteDone(id){
   const n=notes.find(x=>x.id===id);
@@ -2134,16 +2168,31 @@ async function subscribeToPush(){
 
 let syncTimer=null;
 let pendingSyncAfterPull=false;
+let syncInFlight=null;
 function queueServerSync(immediate=false){
-  if(applyingRemote){pendingSyncAfterPull=true;return;}
-  if(localStorage.getItem('ts_authed')!=='1')return;
+  if(applyingRemote){pendingSyncAfterPull=true;return Promise.resolve();}
+  if(localStorage.getItem('ts_authed')!=='1')return Promise.resolve();
   if(syncTimer)clearTimeout(syncTimer);
-  const run=()=>fetch('/.netlify/functions/save-schedule',{
-    method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},
-    body:JSON.stringify({schedule,subjects,cfg,notes,oneOffLessons,baseUpdatedAt:lastSyncedTs})
-  }).then(async res=>{ if(res.status===409){ await pullFromServer(); return; } if(!res.ok) throw new Error('sync '+res.status); const out=await res.json().catch(()=>({})); lastSyncedTs=Number(out.updatedAt||Date.now()); localStorage.setItem('ts_sync_ts',String(lastSyncedTs)); })
-    .catch(err=>console.error('Server sync failed',err));
-  if(immediate)run();else syncTimer=setTimeout(run,1500);
+  const run=()=>{
+    syncInFlight=fetch('/.netlify/functions/save-schedule',{
+      method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},
+      body:JSON.stringify({schedule,subjects,cfg,notes,oneOffLessons,baseUpdatedAt:lastSyncedTs})
+    }).then(async res=>{
+      if(res.status===409){ await pullFromServer(); return; }
+      if(!res.ok) throw new Error('sync '+res.status);
+      const out=await res.json().catch(()=>({}));
+      lastSyncedTs=Number(out.updatedAt||Date.now());
+      localStorage.setItem('ts_sync_ts',String(lastSyncedTs));
+    }).finally(()=>{syncInFlight=null;});
+    return syncInFlight;
+  };
+  if(immediate)return run();
+  return new Promise(resolve=>{syncTimer=setTimeout(()=>run().then(resolve).catch(resolve),1500);});
+}
+async function syncNotesNow(){
+  if(syncTimer){clearTimeout(syncTimer);syncTimer=null;}
+  if(syncInFlight)await syncInFlight;
+  return queueServerSync(true);
 }
 
 async function pullFromServer(){

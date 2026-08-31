@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Адмін-панель — TS Розклад</title>
+<title>Адмін-панель — TS_Daily</title>
 <link href="https://fonts.googleapis.com/css2?family=Exo+2:wght@400;600;700;800&family=Orbitron:wght@700;900&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet">
 <style>
 :root{--bg:#080a10;--bg2:#0d1020;--bg3:#131828;--border:#1e2540;--text:#e8eef8;--text2:#98a8c8;--text3:#5a6888;--accent:#2563eb;--accent2:#60a5fa;--danger:#ef4444;--warn:#f59e0b;--success:#10b981;--radius:14px}
@@ -49,9 +49,9 @@ tbody tr:hover{background:rgba(96,165,250,.035)}
 const API='/.netlify/functions/admin';
 let users=[], currentTab='users', currentAdmin='', currentIsMaster=false;
 function getDeviceId(){let id=localStorage.getItem('ts_device_id');if(!id){id=(crypto.randomUUID?crypto.randomUUID():Date.now().toString(36)+'-'+Math.random().toString(36).slice(2));localStorage.setItem('ts_device_id',id);}return id;}
-function authHeaders(){return localStorage.getItem('ts_authed')==='1'?{'X-TS-Device-ID':getDeviceId()}:{} }
+function authHeaders(){return {'X-TS-Device-ID':getDeviceId()};}
 let adminReauthPromise=null;
-async function rawAdmin(action,extra={}){const r=await fetch(API,{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({action,...extra})});const d=await r.json().catch(()=>({}));return {r,d}}
+async function rawAdmin(action,extra={}){const r=await fetch(API,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({action,...extra})});const d=await r.json().catch(()=>({}));return {r,d}}
 async function ensureAdminReauth(){
   if(adminReauthPromise)return adminReauthPromise;
   adminReauthPromise=(async()=>{
@@ -96,7 +96,7 @@ async function callAdmin(action,extra={},retry=true){
     const ok=await ensureAdminReauth();
     if(ok)return callAdmin(action,extra,false);
   }
-  if(!r.ok)throw new Error(d.error||'Помилка');
+  if(!r.ok){const err=new Error(d.error||'Помилка');if(d.requestId)err.message+=' (ID: '+d.requestId+')';throw err;}
   return d;
 }
 function esc(s){return String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
@@ -107,10 +107,21 @@ document.getElementById('modal').addEventListener('click',e=>{if(e.target.id==='
 
 async function load(){
   const root=document.getElementById('root');
-  if(localStorage.getItem('ts_authed')!=='1'){root.innerHTML='<div class="state err">Увійди в основному застосунку на цьому пристрої.</div>';return}
-  root.innerHTML='<div class="state">Завантаження...</div>';
-  try{const d=await callAdmin('list-users');users=d.users||[];currentAdmin=d.currentAdmin||'';currentIsMaster=!!d.currentIsMaster;render()}
-  catch(e){root.innerHTML=`<div class="state err">❌ ${esc(e.message)}</div>`}
+  root.innerHTML='<div class="state">Перевіряємо сесію...</div>';
+  try{
+    const sr=await fetch('/.netlify/functions/session-status',{method:'GET',cache:'no-store',credentials:'same-origin',headers:authHeaders()});
+    const sd=await sr.json().catch(()=>({}));
+    if(!sr.ok){
+      root.innerHTML=`<div class="state err">❌ ${esc(sd.error||'Сесія недійсна. Увійди в TS_Daily ще раз.')}<div style="margin-top:12px"><a class="btn blue" href="/" style="text-decoration:none">← Повернутися до TS_Daily</a></div></div>`;
+      return;
+    }
+    root.innerHTML='<div class="state">Завантажуємо адмін-панель...</div>';
+    const d=await callAdmin('list-users');
+    users=Array.isArray(d.users)?d.users:[];currentAdmin=d.currentAdmin||sd.username||'';currentIsMaster=!!d.currentIsMaster;render();
+  }catch(e){
+    const msg=String(e&&e.message||'Невідома помилка');
+    root.innerHTML=`<div class="state err">❌ ${esc(msg)}<div class="small" style="margin-top:8px">Якщо проблема повторюється, відкрий журнал Functions у Netlify та перевір запит admin. Для внутрішньої помилки там буде request ID.</div><div style="margin-top:12px"><a class="btn gray" href="/" style="text-decoration:none">← TS_Daily</a></div></div>`;
+  }
 }
 function render(){
   const root=document.getElementById('root');
@@ -118,10 +129,10 @@ function render(){
   root.innerHTML=`<div id="security-alert-bar" style="display:none;margin-bottom:12px"></div><div class="stats"><div class="stat"><b>${users.length}</b><span>Користувачів</span></div><div class="stat"><b>${active}</b><span>Активних</span></div><div class="stat"><b>${banned}</b><span>Заблокованих</span></div><div class="stat"><b>${sessions}</b><span>Активних сесій</span></div></div>
   <div class="tabs"><button class="tab ${currentTab==='users'?'active':''}" onclick="switchTab('users')">👥 Користувачі</button><button class="tab ${currentTab==='security'?'active':''}" onclick="switchTab('security')">🛡️ Безпека</button><button class="tab ${currentTab==='ips'?'active':''}" onclick="switchTab('ips')">🚫 IP-блокування</button><button class="tab ${currentTab==='audit'?'active':''}" onclick="switchTab('audit')">📋 Журнал</button><button class="tab ${currentTab==='storage'?'active':''}" onclick="switchTab('storage')">📦 Сховище</button></div>
   <div id="content"></div>`;
-  if(currentTab==='users')renderUsers();else if(currentTab==='security')renderSecurityPanel();else if(currentTab==='ips')renderIps();else if(currentTab==='storage')renderStorage();else renderAudit();loadSecurityAlerts();
+  if(currentTab==='users')renderUsers();else if(currentTab==='security'){renderSecurityPanel();loadSecurityCheck();}else if(currentTab==='ips'){renderIps([]);loadIps();}else if(currentTab==='storage')renderStorage();else {document.getElementById('content').innerHTML='<div class="panel state">📋 Завантаження журналу...</div>';loadAudit();}loadSecurityAlerts();
 }
-async function loadSecurityAlerts(){try{const r=await fetch('/.netlify/functions/security-alerts',{cache:'no-store',credentials:'same-origin',headers:authHeaders()});const d=await r.json();const el=document.getElementById('security-alert-bar');if(!el)return;if(!r.ok||!d.count){el.style.display='none';return;}el.style.display='block';el.innerHTML=`<div class="dangerbox" style="display:flex;justify-content:space-between;gap:10px;align-items:center"><b>🚨 Підозрілі події за 24 години: ${d.count}</b><span>${d.critical?'🔴 Критичних: '+d.critical:'🟠 Потрібна увага'}</span></div>`;}catch{}}
-function switchTab(t){currentTab=t;render();if(t==='security')loadSecurityCheck();if(t==='ips')loadIps();if(t==='audit')loadAudit();if(t==='storage')loadStorage()}
+async function loadSecurityAlerts(){try{const r=await fetch('/.netlify/functions/security-alerts',{cache:'no-store',credentials:'same-origin',headers:authHeaders()});const d=await r.json();const el=document.getElementById('security-alert-bar');if(!el)return;if(!r.ok){el.style.display='none';return;}if(!d.count){el.style.display='none';return;}el.style.display='block';el.innerHTML=`<div class="dangerbox" style="display:flex;justify-content:space-between;gap:10px;align-items:center"><b>🚨 Підозрілі події за 24 години: ${d.count}</b><span>${d.critical?'🔴 Критичних: '+d.critical:'🟠 Потрібна увага'}</span></div>`;}catch{}}
+function switchTab(t){currentTab=t;render()}
 function renderSecurityPanel(){
   const c=document.getElementById('content');
   c.innerHTML=`<div class="panel"><div class="toolbar"><button class="refresh" onclick="loadSecurityCheck()">🛡️ Запустити перевірку</button><span class="muted" style="align-self:center">Перевірка безпечна: без зміни паролів, сесій, банів або даних користувачів.</span></div><div id="securityResult"><div class="state">Натисни «Запустити перевірку».</div></div></div>`;
@@ -157,7 +168,7 @@ async function loadSecurityCheck(){
   const result=`<div class="security-summary ${overall}"><b style="font-size:16px">${title}</b><div class="small" style="margin-top:5px">PASS: ${pass} · WARN: ${warn} · FAIL: ${fail} · Всього: ${total}</div><div class="small">Перевірено: ${fmt(Date.now())}</div></div><div class="security-grid">${checks.map(x=>`<div class="security-item"><div class="top"><b>${esc(x.label)}</b><span class="badge ${x.status==='PASS'?'ok':x.status==='FAIL'?'banned':''}">${x.status}</span></div><div class="detail">${esc(x.detail||'')}</div></div>`).join('')}</div>`;
   c.innerHTML=`<div class="panel"><div class="toolbar"><button class="refresh" onclick="loadSecurityCheck()">🔄 Перевірити ще раз</button><span class="muted" style="align-self:center">Остання перевірка: ${fmt(Date.now())}</span></div>${result}</div>`;
 }
-async function renderStorage(){const c=document.getElementById('content');c.innerHTML='<div class="panel state">📦 Завантаження сховища...</div>';try{const [r,e]=await Promise.all([fetch('/.netlify/functions/storage-admin',{cache:'no-store',credentials:'same-origin',headers:authHeaders()}),fetch('/.netlify/functions/email-guard-stats',{cache:'no-store',credentials:'same-origin',headers:authHeaders()})]);const d=await r.json(),m=await e.json();if(!r.ok)throw new Error(d.error||'Помилка');c.innerHTML=`<div class="stats"><div class="stat"><b>${(d.total/1048576).toFixed(1)} MB</b><span>Зайнято</span></div><div class="stat"><b>${d.count}</b><span>Файлів</span></div><div class="stat"><b>${d.users}</b><span>Користувачів із файлами</span></div><div class="stat"><b>${m.daily}/${m.dailyLimit}</b><span>Email сьогодні</span></div></div><div class="panel"><h2>📦 Сховище</h2><div class="hint">Файли приватні та доступні лише власнику нотатки.</div><button class="btn gray" onclick="cleanupStorage()">🧹 Очистити осиротілі файли</button></div><div class="panel" style="margin-top:10px"><h2>📧 Email Guard</h2><div class="hint">Сьогодні ${m.daily}/${m.dailyLimit}; година ${m.hourly}/${m.hourlyLimit}; хвилина ${m.minute}/${m.minuteLimit}; залишок дня ${m.remainingDaily}.</div></div>`}catch(e){c.innerHTML=`<div class="panel state err">❌ ${esc(e.message)}</div>`}}
+async function renderStorage(){const c=document.getElementById('content');c.innerHTML='<div class="panel state">📦 Завантаження сховища...</div>';try{const [r,e]=await Promise.all([fetch('/.netlify/functions/storage-admin',{cache:'no-store',credentials:'same-origin',headers:authHeaders()}),fetch('/.netlify/functions/email-guard-stats',{cache:'no-store',credentials:'same-origin',headers:authHeaders()})]);const d=await r.json(),m=await e.json();if(!r.ok){const err=new Error(d.error||'Помилка');if(d.requestId)err.message+=' (ID: '+d.requestId+')';throw err;}c.innerHTML=`<div class="stats"><div class="stat"><b>${(d.total/1048576).toFixed(1)} MB</b><span>Зайнято</span></div><div class="stat"><b>${d.count}</b><span>Файлів</span></div><div class="stat"><b>${d.users}</b><span>Користувачів із файлами</span></div><div class="stat"><b>${m.daily}/${m.dailyLimit}</b><span>Email сьогодні</span></div></div><div class="panel"><h2>📦 Сховище</h2><div class="hint">Файли приватні та доступні лише власнику нотатки.</div><button class="btn gray" onclick="cleanupStorage()">🧹 Очистити осиротілі файли</button></div><div class="panel" style="margin-top:10px"><h2>📧 Email Guard</h2><div class="hint">Сьогодні ${m.daily}/${m.dailyLimit}; година ${m.hourly}/${m.hourlyLimit}; хвилина ${m.minute}/${m.minuteLimit}; залишок дня ${m.remainingDaily}.</div></div>`}catch(e){c.innerHTML=`<div class="panel state err">❌ ${esc(e.message)}</div>`}}
 async function cleanupStorage(){if(!confirm('Очистити лише осиротілі файли, які не мають запису прив’язки?'))return;try{const d=await callAdmin('storage-delete-orphans');alert('✅ Видалено осиротілих файлів: '+d.deleted);renderStorage()}catch(e){alert('❌ '+e.message)}}
 function renderUsers(){
   const c=document.getElementById('content');
@@ -237,7 +248,7 @@ async function doBan(username){try{await callAdmin('ban-user',{username,confirm:
 function showDelete(username){openModal(`<h2>🗑️ Видалити: ${esc(username)}</h2><div class="dangerbox">Це видалить акаунт і його серверні дані. Скасувати операцію після виконання не можна. Для критичної дії додатково знадобиться пароль адміністратора та точне підтвердження.</div><div class="checks"><label class="check"><input id="deleteBlockIp" type="checkbox"> Також заблокувати IP активних сесій</label></div><div class="field"><label>ТЕРМІН IP-БЛОКУ</label><select id="deleteIpDuration"><option value="hour">1 година</option><option value="day">1 день</option><option value="week">7 днів</option><option value="forever" selected>Назавжди</option></select></div><div class="actions"><button class="btn gray" onclick="closeModal()">Скасувати</button><button class="btn del" onclick='doDelete(${JSON.stringify(username)})'>Видалити</button></div>`)}
 async function doDelete(username){if(!confirm(`Остаточно видалити ${username}?`))return;try{await callAdmin('delete-user',{username,confirm:`DELETE ${username}`,blockIp:document.getElementById('deleteBlockIp').checked,ipDuration:document.getElementById('deleteIpDuration').value});closeModal();load()}catch(e){alert('❌ '+e.message)}}
 
-async function loadIps(){try{const d=await callAdmin('ip-list');renderIpList(d.bans||[])}catch(e){document.getElementById('content').innerHTML=`<div class="panel state err">❌ ${esc(e.message)}</div>`}}
+async function loadIps(){try{const d=await callAdmin('ip-list');renderIps(d.bans||[])}catch(e){document.getElementById('content').innerHTML=`<div class="panel state err">❌ ${esc(e.message)}</div>`}}
 function renderIps(bans){
  const c=document.getElementById('content');
  const rows=bans.map(b=>`<tr><td class="mono">${esc(b.ip)}</td><td>${esc(b.reason||'—')}</td><td>${esc(b.username||'—')}</td><td class="mono">${fmt(b.createdAt)}</td><td>${b.expiresAt?fmt(b.expiresAt):'Назавжди'}</td><td><button class="btn unban" onclick='unbanIp(${JSON.stringify(b.ip)})'>Розблокувати</button></td></tr>`).join('');

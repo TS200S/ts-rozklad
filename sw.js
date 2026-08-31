@@ -1,4 +1,4 @@
-const CACHE = 'ts-daily-v5.3.0';
+const CACHE = 'ts-daily-v5.3.8-stable';
 const STATIC_ASSETS = [
   '/',
   '/index.html',

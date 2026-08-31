@@ -1,11 +1,11 @@
 {
   "name": "ts-rozklad",
-  "version": "5.3.2",
+  "version": "5.3.8",
   "private": true,
   "dependencies": {
-    "web-push": "^3.6.7",
-    "@netlify/blobs": "^8.1.0",
-    "nodemailer": "^6.9.16"
+    "web-push": "3.6.7",
+    "@netlify/blobs": "8.1.2",
+    "nodemailer": "9.0.6"
   },
   "scripts": {
     "security:test": "node ts-test/security-test.js"
