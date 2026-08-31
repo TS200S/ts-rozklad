@@ -26,6 +26,6 @@ exports.handler = async (event) => {
       body: JSON.stringify(data || null)
     };
   } catch (err) {
-    return { statusCode: 500, body: JSON.stringify({ error: String(err) }) };
+    return { statusCode: 500, body: JSON.stringify({ error: 'Внутрішня помилка сервера' }) };
   }
 };

@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const { store } = require('./lib/store');
 const { validateSession, extractToken } = require('./lib/session');
 const { sendCodeEmail } = require('./lib/mailer');
-const { enforceIpBan, getClientIp, rateLimit, protectCodeAttempt, safeCodeEqual, hashCode } = require('./lib/security');
+const { enforceIpBan, getClientIp, rateLimit, protectCodeAttempt, safeCodeEqual, hashCode, isSameOriginRequest } = require('./lib/security');
 const { recordActivity } = require('./lib/activity');
 
 const CODE_TTL_MS = 15 * 60 * 1000;
@@ -27,6 +27,7 @@ async function getSessionUser(event, s) {
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
+  if (!isSameOriginRequest(event)) return json(403, { error: 'Недозволене походження запиту' });
 
   try {
     const s = store();
@@ -139,6 +140,6 @@ exports.handler = async (event) => {
 
     return json(400, { error: 'Невідома дія' });
   } catch (err) {
-    return json(500, { error: String(err) });
+    return json(500, { error: 'Внутрішня помилка сервера' });
   }
 };

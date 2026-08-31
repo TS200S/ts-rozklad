@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const { store } = require('./lib/store');
 const { createSession, sessionMeta, sessionCookie } = require('./lib/session');
-const { enforceIpBan, getClientIp, rateLimit, hashCode } = require('./lib/security');
+const { enforceIpBan, getClientIp, rateLimit, hashCode, isSameOriginRequest } = require('./lib/security');
 const { sendLoginCodeEmail, sendNewDeviceAlertEmail } = require('./lib/mailer');
 const { recordActivity } = require('./lib/activity');
 
@@ -11,11 +11,15 @@ function hashPassword(password, salt) {
 
 const MAX_ATTEMPTS = 6;
 const LOCK_MINUTES = 15;
+const DUMMY_SALT = 'ts-daily-dummy-salt-v1';
+const DUMMY_HASH = crypto.scryptSync('ts-daily-dummy-password', DUMMY_SALT, 64);
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
+
+  if (!isSameOriginRequest(event)) return { statusCode: 403, body: JSON.stringify({ error: 'Недозволене походження запиту' }) };
 
   try {
     const body = JSON.parse(event.body || '{}');
@@ -50,9 +54,11 @@ exports.handler = async (event) => {
 
     const user = await s.get(userKey, { type: 'json' }).catch(() => null);
 
-    // Same error whether the account doesn't exist or the password is wrong,
-    // so a logged error can't be used to enumerate which logins are taken.
+    // Burn roughly the same password-hash work even when the username does
+    // not exist. This reduces timing-based account enumeration.
     if (!user) {
+      const supplied = crypto.scryptSync(String(password), DUMMY_SALT, 64);
+      crypto.timingSafeEqual(DUMMY_HASH, supplied);
       return { statusCode: 401, body: genericError() };
     }
     if (user.banned) {
@@ -124,9 +130,9 @@ exports.handler = async (event) => {
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json', 'Set-Cookie': sessionCookie(token) },
-      body: JSON.stringify({ ok: true, userId: user.userId, username: user.username, email: user.email || null, emailVerified: user.emailVerified === true, role: (user.role === 'admin' || String(user.username).toLowerCase() === String(process.env.ADMIN_USERNAME || '').trim().toLowerCase()) ? 'admin' : 'user', expiresAt })
+      body: JSON.stringify({ ok: true, userId: user.userId, username: user.username, email: user.email || null, emailVerified: user.emailVerified === true, nickname: user.nickname || user.username, role: (user.role === 'admin' || String(user.username).toLowerCase() === String(process.env.ADMIN_USERNAME || '').trim().toLowerCase()) ? 'admin' : 'user', expiresAt })
     };
   } catch (err) {
-    return { statusCode: 500, body: JSON.stringify({ error: String(err) }) };
+    return { statusCode: 500, body: JSON.stringify({ error: 'Внутрішня помилка сервера' }) };
   }
 };

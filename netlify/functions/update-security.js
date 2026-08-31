@@ -1,10 +1,11 @@
 const { store } = require('./lib/store');
 const { validateSession, extractToken } = require('./lib/session');
-const { enforceIpBan } = require('./lib/security');
+const { enforceIpBan, isSameOriginRequest } = require('./lib/security');
 const { recordActivity } = require('./lib/activity');
 function json(statusCode, body) { return { statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }; }
 exports.handler = async event => {
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method Not Allowed' });
+  if (!isSameOriginRequest(event)) return json(403, { error: 'Недозволене походження запиту' });
   try {
     const s = store();
     if (await enforceIpBan(s, event)) return json(403, { error: 'Цей IP-адрес заблоковано' });
@@ -26,5 +27,5 @@ exports.handler = async event => {
     await s.setJSON(`user:${user.username}`, user);
     await recordActivity(s, user.userId, 'security-settings-changed', { security: user.security });
     return json(200, { ok: true, security: user.security });
-  } catch (err) { return json(500, { error: String(err) }); }
+  } catch (err) { return json(500, { error: 'Внутрішня помилка сервера' }); }
 };

@@ -1,8 +1,8 @@
 const crypto = require('crypto');
 const { store } = require('./lib/store');
 const { createSession, sessionMeta, sessionCookie } = require('./lib/session');
-const { sendCodeEmail } = require('./lib/mailer');
-const { enforceIpBan, getClientIp, rateLimit, protectCodeAttempt, safeCodeEqual, hashCode } = require('./lib/security');
+const { sendCodeEmail, sendRegistrationSuccessEmail } = require('./lib/mailer');
+const { enforceIpBan, getClientIp, rateLimit, protectCodeAttempt, safeCodeEqual, hashCode, isSameOriginRequest } = require('./lib/security');
 const { recordActivity } = require('./lib/activity');
 
 function hashPassword(password, salt) {
@@ -16,6 +16,7 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
+  if (!isSameOriginRequest(event)) return { statusCode: 403, body: JSON.stringify({ error: 'Недозволене походження запиту' }) };
   try {
     const body = JSON.parse(event.body || '{}');
     const { action } = body;
@@ -26,15 +27,19 @@ exports.handler = async (event) => {
 
     // ---- Step 1: validate input, stash a pending registration, email a code ----
     if (action === 'request') {
-      const { username, password, confirmPassword, email } = body;
-      if (!username || !password || !email || !confirmPassword) {
+      const { username, nickname, password, confirmPassword, email } = body;
+      if (!username || !nickname || !password || !email || !confirmPassword) {
         return { statusCode: 400, body: JSON.stringify({ error: 'Заповни всі поля' }) };
       }
       const uname = String(username).trim().toLowerCase();
       const mail = String(email).trim().toLowerCase();
+      const nick = String(nickname).trim();
 
       if (uname.length < 3 || !/^[a-z0-9_.]+$/.test(uname)) {
         return { statusCode: 400, body: JSON.stringify({ error: 'Логін: мінімум 3 символи, лише латиниця/цифри/_/.' }) };
+      }
+      if (nick.length < 2 || nick.length > 24 || !/^[\p{L}0-9_. -]+$/u.test(nick)) {
+        return { statusCode: 400, body: JSON.stringify({ error: 'Нікнейм: 2–24 символи, без спеціальних символів' }) };
       }
       if (String(password) !== String(confirmPassword)) {
         return { statusCode: 400, body: JSON.stringify({ error: 'Паролі не збігаються' }) };
@@ -65,7 +70,7 @@ exports.handler = async (event) => {
       const code = genCode();
 
       await s.setJSON(`pending-reg:${mail}`, {
-        username: uname, salt, hash, codeHash: hashCode(code).toString('hex'),
+        username: uname, nickname: nick, salt, hash, codeHash: hashCode(code).toString('hex'),
         expiresAt: Date.now() + CODE_TTL_MS,
         attempts: 0
       });
@@ -124,7 +129,7 @@ exports.handler = async (event) => {
 
       const userId = crypto.randomUUID();
       const userRecord = {
-        userId, username: pending.username, email: mail, emailVerified: true,
+        userId, username: pending.username, nickname: pending.nickname || pending.username, email: mail, emailVerified: true,
         salt: pending.salt, hash: pending.hash,
         createdAt: Date.now(), lastActive: Date.now(), security: { newDeviceEmail: true, requireNewDeviceEmail: false, requireEveryLoginEmail: false }, trustedDeviceIds: []
       };
@@ -138,15 +143,16 @@ exports.handler = async (event) => {
       const { token, expiresAt } = await createSession(s, userId, pending.username, meta);
       if (registrationDeviceId) { userRecord.trustedDeviceIds = [registrationDeviceId]; await s.setJSON(`user:${pending.username}`, userRecord); }
       await recordActivity(s, userId, 'account-created', { ip, device: meta.device });
+      sendRegistrationSuccessEmail(mail, { username: pending.username, nickname: pending.nickname || pending.username, at: Date.now() }).catch(() => {});
 
       return {
         statusCode: 200,
-        headers: { 'Content-Type': 'application/json', 'Set-Cookie': sessionCookie(token) }, body: JSON.stringify({ ok: true, userId, username: pending.username, expiresAt })
+        headers: { 'Content-Type': 'application/json', 'Set-Cookie': sessionCookie(token) }, body: JSON.stringify({ ok: true, userId, username: pending.username, nickname: pending.nickname || pending.username, expiresAt })
       };
     }
 
     return { statusCode: 400, body: JSON.stringify({ error: 'Невідома дія' }) };
   } catch (err) {
-    return { statusCode: 500, body: JSON.stringify({ error: String(err) }) };
+    return { statusCode: 500, body: JSON.stringify({ error: 'Внутрішня помилка сервера' }) };
   }
 };

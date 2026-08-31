@@ -1,7 +1,7 @@
 const crypto = require('crypto');
 const { store } = require('./lib/store');
 const { validateSession, extractToken, deleteAllSessionsForUser } = require('./lib/session');
-const { enforceIpBan, rateLimit, getClientIp } = require('./lib/security');
+const { enforceIpBan, rateLimit, getClientIp, isSameOriginRequest } = require('./lib/security');
 const { recordActivity } = require('./lib/activity');
 
 function hashPassword(password, salt) { return crypto.scryptSync(password, salt, 64).toString('hex'); }
@@ -9,6 +9,7 @@ function json(statusCode, body) { return { statusCode, headers: { 'Content-Type'
 
 exports.handler = async event => {
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method Not Allowed' });
+  if (!isSameOriginRequest(event)) return json(403, { error: 'Недозволене походження запиту' });
   try {
     const s = store();
     const ipBan = await enforceIpBan(s, event);
@@ -37,5 +38,5 @@ exports.handler = async event => {
     await recordActivity(s, user.userId, 'password-changed', { ip, device: sess.device });
     await deleteAllSessionsForUser(s, user.userId);
     return json(200, { ok: true, reLoginRequired: true });
-  } catch (err) { return json(500, { error: String(err) }); }
+  } catch (err) { return json(500, { error: 'Внутрішня помилка сервера' }); }
 };

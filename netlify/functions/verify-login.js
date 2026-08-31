@@ -1,12 +1,13 @@
 const crypto = require('crypto');
 const { store } = require('./lib/store');
 const { createSession, sessionCookie } = require('./lib/session');
-const { enforceIpBan, rateLimit, getClientIp, protectCodeAttempt, safeCodeEqual } = require('./lib/security');
+const { enforceIpBan, rateLimit, getClientIp, protectCodeAttempt, safeCodeEqual, isSameOriginRequest } = require('./lib/security');
 const { sendLoginCodeEmail } = require('./lib/mailer');
 const { recordActivity } = require('./lib/activity');
 function json(statusCode, body) { return { statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }; }
 exports.handler = async event => {
   if (event.httpMethod !== 'POST') return json(405, { error: 'Method Not Allowed' });
+  if (!isSameOriginRequest(event)) return json(403, { error: 'Недозволене походження запиту' });
   try {
     const s = store();
     if (await enforceIpBan(s, event)) return json(403, { error: 'Цей IP-адрес заблоковано' });
@@ -36,6 +37,6 @@ exports.handler = async event => {
     await s.setJSON(`user:${user.username}`, user);
     await s.delete(`pending-login:${challengeId}`).catch(() => {});
     await recordActivity(s, user.userId, 'login-email-verified', { ip: pending.meta.ip, device: pending.meta.device, challenge: true });
-    return { statusCode: 200, headers: { 'Content-Type': 'application/json', 'Set-Cookie': sessionCookie(token) }, body: JSON.stringify({ ok: true, userId: user.userId, username: user.username, email: user.email || null, emailVerified: user.emailVerified === true, role: (user.role === 'admin' || String(user.username).toLowerCase() === String(process.env.ADMIN_USERNAME || '').trim().toLowerCase()) ? 'admin' : 'user', expiresAt }) };
-  } catch (err) { return json(500, { error: String(err) }); }
+    return { statusCode: 200, headers: { 'Content-Type': 'application/json', 'Set-Cookie': sessionCookie(token) }, body: JSON.stringify({ ok: true, userId: user.userId, username: user.username, email: user.email || null, emailVerified: user.emailVerified === true, nickname: user.nickname || user.username, role: (user.role === 'admin' || String(user.username).toLowerCase() === String(process.env.ADMIN_USERNAME || '').trim().toLowerCase()) ? 'admin' : 'user', expiresAt }) };
+  } catch (err) { return json(500, { error: 'Внутрішня помилка сервера' }); }
 };

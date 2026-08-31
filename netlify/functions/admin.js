@@ -1,8 +1,8 @@
 const crypto = require('crypto');
 const net = require('net');
-const { store } = require('./lib/store');
-const { validateSession, extractToken, deleteAllSessionsForUser, listSessionsForUser, deleteSession } = require('./lib/session');
-const { getClientIp, isIpBanned } = require('./lib/security');
+const { store, atomicUpdateJSON } = require('./lib/store');
+const { validateSession, extractToken, deleteAllSessionsForUser, listSessionsForUser, deleteSession, deleteSessionByKey, sessionKey } = require('./lib/session');
+const { getClientIp, isIpBanned, isSameOriginRequest } = require('./lib/security');
 const { listActivity, recordActivity } = require('./lib/activity');
 const { sendAdminRecoveryEmail, sendAdmin2FACodeEmail, sendAdminEmergencyRecoveryEmail } = require('./lib/mailer');
 const { protectCodeAttempt, safeCodeEqual, hashCode } = require('./lib/security');
@@ -42,13 +42,26 @@ function sessionId(token) {
 }
 
 async function audit(s, adminUsername, action, details = {}) {
-  const list = (await s.get('audit-log', { type: 'json' }).catch(() => null)) || [];
-  const previous = list.length ? list[list.length - 1] : null;
-  const prevHash = previous?.hash || 'GENESIS';
-  const item = { id: crypto.randomUUID(), at: Date.now(), adminUsername, action, details, prevHash };
-  item.hash = crypto.createHash('sha256').update(JSON.stringify({ id:item.id, at:item.at, adminUsername:item.adminUsername, action:item.action, details:item.details, prevHash:item.prevHash })).digest('hex');
-  list.push(item);
-  await s.setJSON('audit-log', list.slice(-1000)).catch(() => {});
+  const result = await atomicUpdateJSON('audit-log', [], list => {
+    const rows = Array.isArray(list) ? list : [];
+    const anchor = 'GENESIS';
+    const previous = rows.length ? rows[rows.length - 1] : null;
+    const prevHash = previous?.hash || anchor;
+    const item = {
+      id: crypto.randomUUID(),
+      at: Date.now(),
+      adminUsername: String(adminUsername || '').slice(0, 120),
+      action: String(action || '').slice(0, 120),
+      details,
+      prevHash
+    };
+    item.hash = crypto.createHash('sha256').update(JSON.stringify({ id: item.id, at: item.at, adminUsername: item.adminUsername, action: item.action, details: item.details, prevHash: item.prevHash })).digest('hex');
+    return [...rows, item].slice(-1000);
+  }, { store: s });
+  const rows = result.value || [];
+  const first = rows[0];
+  const anchor = first?.prevHash || 'GENESIS';
+  await s.setJSON('audit-anchor', anchor).catch(() => {});
 }
 
 async function auditAdmin(s, admin, action, details = {}) {
@@ -66,7 +79,7 @@ async function auditAdmin(s, admin, action, details = {}) {
 
 async function verifyAuditLog(s) {
   const list = (await s.get('audit-log', { type: 'json' }).catch(() => null)) || [];
-  let prev = 'GENESIS';
+  let prev = String((await s.get('audit-anchor', { type: 'json' }).catch(() => null)) || 'GENESIS');
   for (const item of list) {
     if (!item.hash) continue;
     const expected = crypto.createHash('sha256').update(JSON.stringify({ id:item.id, at:item.at, adminUsername:item.adminUsername, action:item.action, details:item.details, prevHash:item.prevHash })).digest('hex');
@@ -90,6 +103,7 @@ async function setIpBan(s, ip, { reason = '', duration = 'forever', username = '
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode: 405, body: 'Method Not Allowed' };
+  if (!isSameOriginRequest(event)) return json(403, { error: 'Недозволене походження запиту' });
 
   try {
     const s = store();
@@ -143,7 +157,7 @@ exports.handler = async (event) => {
       if (newPassword.length < 12 || newPassword.length > 128) return json(400, { error: 'Новий пароль адмінки має містити від 12 до 128 символів.' });
       if (newPassword !== confirmPassword) return json(400, { error: 'Паролі адмінки не збігаються.' });
       const ip = getClientIp(event);
-      const rl = await require('./lib/security').rateLimit(s, `admin-recovery-verify:${username}:${ip}`, 8, 15 * 15 * 1000);
+      const rl = await require('./lib/security').rateLimit(s, `admin-recovery-verify:${username}:${ip}`, 8, 15 * 60 * 1000);
       if (!rl.allowed) return json(429, { error: `Забагато спроб. Спробуй через ${rl.retryAfter} с.` });
       const user = await s.get(`user:${username}`, { type: 'json' }).catch(() => null);
       const master = (process.env.ADMIN_USERNAME || '').trim().toLowerCase();
@@ -208,7 +222,7 @@ exports.handler = async (event) => {
       const code = String(crypto.randomInt(100000, 1000000));
       const codeHash = crypto.createHash('sha256').update(code).digest('hex');
       sess.admin2faChallenge = { hash: codeHash, expiresAt: Date.now() + 10 * 60 * 1000, attempts: 0, sentAt: Date.now() };
-      await s.setJSON(`session:${token}`, sess);
+      await s.setJSON(`session:${sessionKey(token)}`, sess);
       await sendAdmin2FACodeEmail(user.email, code, 'critical');
       await audit(s, user.username, 'admin-2fa-sent', { ip, sessionId: sessionId(token) });
       return json(200, { ok:true, requires2FA:true, expiresAt: sess.admin2faChallenge.expiresAt, emailMasked: maskEmail(user.email) });
@@ -233,13 +247,13 @@ exports.handler = async (event) => {
       if (!safeCodeEqual(code, ch.hash)) {
         ch.attempts = attempts + 1;
         sess.admin2faChallenge = ch;
-        await s.setJSON(`session:${token}`, sess);
+        await s.setJSON(`session:${sessionKey(token)}`, sess);
         await audit(s, user.username, 'admin-2fa-failed', { ip, attempts: ch.attempts });
         return json(401, { error: 'Невірний код 2FA' });
       }
       delete sess.admin2faChallenge;
       sess.adminStepUpAt = Date.now();
-      await s.setJSON(`session:${token}`, sess);
+      await s.setJSON(`session:${sessionKey(token)}`, sess);
       await audit(s, user.username, 'admin-2fa-success', { ip, sessionId: sessionId(token) });
       return json(200, { ok:true, expiresAt: sess.adminStepUpAt + 10 * 60 * 1000 });
     }
@@ -256,7 +270,7 @@ exports.handler = async (event) => {
       if (old && Date.now() - Number(old.sentAt || 0) < 60 * 1000) return json(429, { error: 'Новий код можна запросити через хвилину.' });
       const code = String(crypto.randomInt(100000, 1000000));
       sess.admin2faChallenge = { hash: crypto.createHash('sha256').update(code).digest('hex'), expiresAt: Date.now() + 10 * 60 * 1000, attempts: 0, sentAt: Date.now() };
-      await s.setJSON(`session:${token}`, sess);
+      await s.setJSON(`session:${sessionKey(token)}`, sess);
       await sendAdmin2FACodeEmail(user.email, code, 'critical');
       return json(200, { ok:true, expiresAt:sess.admin2faChallenge.expiresAt, emailMasked:maskEmail(user.email) });
     }
@@ -309,7 +323,7 @@ exports.handler = async (event) => {
       const salt = crypto.randomBytes(16).toString('hex');
       const code = String(crypto.randomInt(100000, 1000000));
       sess.adminPasswordSetup = { hash: crypto.scryptSync(newPassword, salt, 64).toString('hex'), salt, codeHash: crypto.createHash('sha256').update(code).digest('hex'), expiresAt: Date.now() + 10 * 60 * 1000, attempts: 0, authorizationType };
-      await s.setJSON(`session:${token}`, sess);
+      await s.setJSON(`session:${sessionKey(token)}`, sess);
       await sendAdmin2FACodeEmail(user.email, code, 'setup');
       return json(200, { ok:true, requires2FA:true, emailMasked:maskEmail(user.email), expiresAt:sess.adminPasswordSetup.expiresAt });
     }
@@ -328,7 +342,7 @@ exports.handler = async (event) => {
       const ip = getClientIp(event);
       const globalRl = await protectCodeAttempt(s, 'admin-2fa-setup', user.userId, ip, 8, 15 * 60 * 1000);
       if (!globalRl.allowed) return json(429, { error: `Забагато спроб 2FA. Спробуй через ${globalRl.retryAfter} с.` });
-      if (!safeCodeEqual(code, setup.codeHash)) { setup.attempts += 1; sess.adminPasswordSetup = setup; await s.setJSON(`session:${token}`, sess); return json(401, { error: 'Невірний код.' }); }
+      if (!safeCodeEqual(code, setup.codeHash)) { setup.attempts += 1; sess.adminPasswordSetup = setup; await s.setJSON(`session:${sessionKey(token)}`, sess); return json(401, { error: 'Невірний код.' }); }
       const wasConfigured = !!(user.adminPasswordHash && user.adminPasswordSalt);
       user.adminPasswordHash = setup.hash;
       user.adminPasswordSalt = setup.salt;
@@ -338,21 +352,23 @@ exports.handler = async (event) => {
       // Invalidate every other session so a previous admin session cannot keep using the old credential.
       const sessions = await listSessionsForUser(s, user.userId);
       for (const other of sessions) {
-        if (other.token !== token) await deleteSession(s, other.token).catch(() => {});
+        if (other.sessionKey !== sessionKey(token)) await deleteSessionByKey(s, user.userId, other.sessionKey).catch(() => {});
       }
       delete sess.adminPasswordSetup;
       delete sess.adminStepUpAt;
       delete sess.admin2faChallenge;
-      await s.setJSON(`session:${token}`, sess);
+      await s.setJSON(`session:${sessionKey(token)}`, sess);
       await audit(s, user.username, wasConfigured ? 'admin-password-changed' : 'admin-password-created', { ip:getClientIp(event), authorizationType: setup.authorizationType || (wasConfigured ? 'admin-password' : 'account-password') });
       return json(200, { ok:true, changed:wasConfigured });
     }
 
 
-    const criticalActions = new Set(['revoke-session','revoke-all-sessions','ban-user','unban-user','delete-user','update-email','confirm-admin-email','clear-account-history','set-role','ip-ban','ip-unban']);
+    const criticalActions = new Set(['revoke-session','revoke-all-sessions','ban-user','unban-user','delete-user','update-email','confirm-admin-email','clear-account-history','set-role','ip-ban','ip-unban','storage-delete-orphans']);
     const admin = await requireAdmin(event, s, { stepUp: criticalActions.has(action) });
     if (!admin) return json(403, { error: 'Немає доступу' });
     if (admin.requiresAdminReauth) return json(428, { error: 'Потрібне повторне підтвердження пароля адміністратора', requiresAdminReauth: true });
+
+    if (action === 'storage-delete-orphans') { const { blobs } = await s.list({prefix:'file:'}); let deleted=0; for(const b of blobs){const parts=b.key.split(':');const uid=parts[1],id=parts.slice(2).join(':');const list=await s.get(`file-meta:${uid}`,{type:'json'}).catch(()=>[]);if(!Array.isArray(list)||!list.some(x=>x.id===id)){await s.delete(b.key);deleted++;}} await auditAdmin(s,admin,'storage-delete-orphans',{deleted}); return json(200,{ok:true,deleted}); }
 
     if (action === 'security-check') {
       const checks = [];
@@ -372,6 +388,10 @@ exports.handler = async (event) => {
       checks.push({ id:'2fa', label:'Email 2FA для критичних дій', status:'PASS', detail:'Критичні адміністративні дії захищені step-up + email-кодом.' });
       checks.push({ id:'bruteforce', label:'Захист від перебору', status:'PASS', detail:'Для повторного підтвердження та кодів використовується rate limit.' });
       checks.push({ id:'sensitive-logs', label:'Секрети не записуються в аудит', status:'PASS', detail:'Паролі, токени та коди не передаються в audit payload.' });
+      const emailDaily=Number(process.env.EMAIL_SAFE_DAILY_LIMIT||400); const emailMinute=Number(process.env.EMAIL_SAFE_MINUTE_LIMIT||8);
+      checks.push({ id:'email-guard', label:'Email Guard', status:emailDaily>0&&emailMinute>0?'PASS':'WARN', detail:`Ліміти налаштовані: ${emailDaily} листів/добу, ${emailMinute}/хв.` });
+      checks.push({ id:'private-files', label:'Захист вкладень', status:'PASS', detail:'Вкладення проходять перевірку сесії, власника, типу та розміру; доставка no-store.' });
+      checks.push({ id:'oneoff', label:'Одноразові пари', status:'PASS', detail:'Одноразові заняття зберігаються окремо та прив’язані до дати.' });
       return json(200, { ok:true, generatedAt:Date.now(), checks });
     }
 
@@ -396,7 +416,7 @@ exports.handler = async (event) => {
         const currentOrigin = String(process.env.URL || process.env.DEPLOY_PRIME_URL || '').replace(/\/$/, '');
         const subs = allSubs.filter(sub => sub && sub.siteOrigin === currentOrigin);
         users.push({
-          username: u.username, email: u.email || null, emailVerified: u.emailVerified === true,
+          username: u.username, nickname: u.nickname || u.username, email: u.email || null, emailVerified: u.emailVerified === true,
           role: isMasterUsername(u.username, admin.master) ? 'master' : (u.role || 'user'), isMaster: isMasterUsername(u.username, admin.master), createdAt: u.createdAt || null, lastActive: u.lastActive || null,
           banned: !!u.banned, banReason: u.banReason || null, banExpiresAt: u.banExpiresAt || 0, sessionsCount: sessions.length,
           ips: [...new Set(sessions.map(x => x.ip).filter(Boolean))],
@@ -418,7 +438,7 @@ exports.handler = async (event) => {
         ok: true,
         username,
         sessions: sessions.map(x => ({
-          id: sessionId(x.token), createdAt: x.createdAt, expiresAt: x.expiresAt,
+          id: x.sessionId || String(x.sessionKey || '').slice(-16), createdAt: x.createdAt, expiresAt: x.expiresAt,
           lastActive: x.lastActive, ip: x.ip || 'unknown', userAgent: x.userAgent || '',
           device: x.device || null
         }))
@@ -434,9 +454,9 @@ exports.handler = async (event) => {
       if (!canManageTarget(admin, user)) return json(403, { error: 'Звичайний адміністратор не може керувати головним адміністратором або іншим адміністратором' });
       if (String(body.confirm || '') !== `REVOKE ${username} ${sid}`) return json(400, { error: `Для завершення сесії введи: REVOKE ${username} ${sid}` });
       const sessions = await listSessionsForUser(s, user.userId);
-      const target = sessions.find(x => sessionId(x.token) === sid);
+      const target = sessions.find(x => String(x.sessionId || '') === sid);
       if (!target) return json(404, { error: 'Сесію не знайдено' });
-      await deleteSession(s, target.token);
+      await deleteSessionByKey(s, user.userId, target.sessionKey);
       await auditAdmin(s, admin, 'revoke-session', { username, ip: target.ip });
       return json(200, { ok: true });
     }
@@ -475,7 +495,7 @@ exports.handler = async (event) => {
       await s.setJSON(`user:${username}`, user);
       if (isBan) {
         for (const session of sessionsBeforeBan) {
-          await s.setJSON(`revoked-ban:${session.token}`, {
+          await s.setJSON(`revoked-ban:${String(session.sessionKey || '').replace(/^session:/,'')}`, {
             username,
             userId: user.userId,
             reason: user.banReason || '',
@@ -528,6 +548,9 @@ exports.handler = async (event) => {
       await s.delete(`user:${username}`).catch(() => {});
       if (user.email) await s.delete(`email:${user.email}`).catch(() => {});
       await s.delete(`schedule-data:${user.userId}`).catch(() => {});
+      const userFiles = (await s.get(`file-meta:${user.userId}`, {type:'json'}).catch(() => null)) || [];
+      for (const f of userFiles) if (f?.blobKey) await s.delete(f.blobKey).catch(() => {});
+      await s.delete(`file-meta:${user.userId}`).catch(() => {});
       await s.delete(`subscriptions:${user.userId}`).catch(() => {});
       await s.delete(`fired-log:${user.userId}`).catch(() => {});
       await auditAdmin(s, admin, 'delete-user', { username, blockIp: !!body.blockIp });
@@ -595,7 +618,7 @@ exports.handler = async (event) => {
       if (!canManageTarget(admin, user)) return json(403, { error: 'Недостатньо прав для перегляду цього акаунта' });
       const sessions = await listSessionsForUser(s, user.userId);
       const activity = await listActivity(s, user.userId, 1000);
-      return json(200, { ok: true, username, profile: { email: user.email || null, emailVerified: user.emailVerified === true, createdAt: user.createdAt || null, lastActive: user.lastActive || null, banned: !!user.banned, banReason: user.banReason || null, banAt: user.bannedAt || null, banExpiresAt: user.banExpiresAt || 0, security: user.security || { newDeviceEmail: true, requireNewDeviceEmail: false, requireEveryLoginEmail: false } }, sessions: sessions.map(x => ({ id: sessionId(x.token), createdAt: x.createdAt, expiresAt: x.expiresAt, lastActive: x.lastActive, ip: x.ip || 'unknown', userAgent: x.userAgent || '', device: x.device || null })), activity });
+      return json(200, { ok: true, username, profile: { email: user.email || null, emailVerified: user.emailVerified === true, createdAt: user.createdAt || null, lastActive: user.lastActive || null, banned: !!user.banned, banReason: user.banReason || null, banAt: user.bannedAt || null, banExpiresAt: user.banExpiresAt || 0, security: user.security || { newDeviceEmail: true, requireNewDeviceEmail: false, requireEveryLoginEmail: false } }, sessions: sessions.map(x => ({ id: x.sessionId || String(x.sessionKey || '').slice(-16), createdAt: x.createdAt, expiresAt: x.expiresAt, lastActive: x.lastActive, ip: x.ip || 'unknown', userAgent: x.userAgent || '', device: x.device || null })), activity });
     }
 
     if (action === 'clear-account-history') {
@@ -673,6 +696,6 @@ exports.handler = async (event) => {
 
     return json(400, { error: 'Невідома дія' });
   } catch (err) {
-    return json(500, { error: String(err) });
+    return json(500, { error: 'Внутрішня помилка сервера' });
   }
 };

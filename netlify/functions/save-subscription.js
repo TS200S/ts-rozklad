@@ -1,11 +1,13 @@
 const { store } = require('./lib/store');
 const { validateSession, extractToken } = require('./lib/session');
-const { enforceIpBan } = require('./lib/security');
+const { enforceIpBan, isSameOriginRequest } = require('./lib/security');
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
+
+  if (!isSameOriginRequest(event)) return { statusCode: 403, body: JSON.stringify({ error: 'Недозволене походження запиту' }) };
 
   try {
     const s = store();
@@ -46,6 +48,6 @@ exports.handler = async (event) => {
       body: JSON.stringify({ ok: true, count: updated.length })
     };
   } catch (err) {
-    return { statusCode: 500, body: JSON.stringify({ error: String(err) }) };
+    return { statusCode: 500, body: JSON.stringify({ error: 'Внутрішня помилка сервера' }) };
   }
 };

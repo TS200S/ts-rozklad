@@ -2,7 +2,7 @@ const crypto = require('crypto');
 const { store } = require('./lib/store');
 const { deleteAllSessionsForUser } = require('./lib/session');
 const { sendCodeEmail } = require('./lib/mailer');
-const { enforceIpBan, getClientIp, rateLimit, protectCodeAttempt, safeCodeEqual, hashCode } = require('./lib/security');
+const { enforceIpBan, getClientIp, rateLimit, protectCodeAttempt, safeCodeEqual, hashCode, isSameOriginRequest } = require('./lib/security');
 const { recordActivity } = require('./lib/activity');
 
 function hashPassword(password, salt) {
@@ -16,6 +16,7 @@ exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: 'Method Not Allowed' };
   }
+  if (!isSameOriginRequest(event)) return { statusCode: 403, body: JSON.stringify({ error: 'Недозволене походження запиту' }) };
   try {
     const body = JSON.parse(event.body || '{}');
     const { action } = body;
@@ -118,6 +119,6 @@ exports.handler = async (event) => {
 
     return { statusCode: 400, body: JSON.stringify({ error: 'Невідома дія' }) };
   } catch (err) {
-    return { statusCode: 500, body: JSON.stringify({ error: String(err) }) };
+    return { statusCode: 500, body: JSON.stringify({ error: 'Внутрішня помилка сервера' }) };
   }
 };

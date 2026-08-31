@@ -1,6 +1,6 @@
 const { store } = require('./lib/store');
-const { validateSession, extractToken } = require('./lib/session');
-const { enforceIpBan, getClientIp } = require('./lib/security');
+const { validateSession, extractToken, sessionKey } = require('./lib/session');
+const { enforceIpBan, getClientIp, isSameOriginRequest } = require('./lib/security');
 
 function json(statusCode, body) {
   return { statusCode, headers: {'Content-Type':'application/json','Cache-Control':'no-store'}, body: JSON.stringify(body) };
@@ -26,7 +26,7 @@ exports.handler = async (event) => {
       if(exp && exp<=Date.now()){
         // The account ban has expired. The old token is still invalid;
         // the user must log in again to obtain a fresh session.
-        await s.delete(`session:${token}`).catch(()=>{});
+        await s.delete(`session:${sessionKey(token)}`).catch(()=>{});
         return json(401,{error:'Термін блокування завершено. Увійди знову.',sessionExpired:true,banEnded:true});
       }
       return json(403,{error:'Акаунт заблоковано',banned:true,
@@ -58,6 +58,6 @@ exports.handler = async (event) => {
 
     return json(200,{ok:true,username:sess.username,expiresAt:sess.expiresAt,lastActive:sess.lastActive,ip:getClientIp(event)});
   } catch(err) {
-    return json(500,{error:String(err)});
+    return json(500,{error:'Внутрішня помилка сервера'});
   }
 };

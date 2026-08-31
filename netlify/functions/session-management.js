@@ -1,6 +1,6 @@
 const { store } = require('./lib/store');
-const { validateSession, extractToken, listSessionsForUser, getSessionPublicId, revokeSessionById, revokeOtherSessions } = require('./lib/session');
-const { enforceIpBan } = require('./lib/security');
+const { validateSession, extractToken, listSessionsForUser, getSessionPublicId, revokeSessionById, revokeOtherSessions, sessionKey } = require('./lib/session');
+const { enforceIpBan, isSameOriginRequest } = require('./lib/security');
 const { recordActivity } = require('./lib/activity');
 
 function json(statusCode, body) {
@@ -9,6 +9,7 @@ function json(statusCode, body) {
 
 exports.handler = async (event) => {
   if (!['GET','POST'].includes(event.httpMethod)) return json(405, { error: 'Method Not Allowed' });
+  if (event.httpMethod !== 'GET' && !isSameOriginRequest(event)) return json(403,{error:'Недозволене походження запиту'});
   try {
     const s = store();
     if (await enforceIpBan(s, event)) return json(403, { error: 'Цей IP-адрес заблоковано' });
@@ -22,8 +23,8 @@ exports.handler = async (event) => {
         ok: true,
         currentSessionId: getSessionPublicId(token, sess),
         sessions: sessions.map(x => ({
-          sessionId: getSessionPublicId(x.token, x),
-          current: x.token === token,
+          sessionId: getSessionPublicId('', x),
+          current: x.sessionId === getSessionPublicId(token, sess),
           createdAt: x.createdAt,
           lastActive: x.lastActive,
           expiresAt: x.expiresAt,
@@ -52,6 +53,6 @@ exports.handler = async (event) => {
     }
     return json(400, { error: 'Невідома дія' });
   } catch (err) {
-    return json(500, { error: String(err) });
+    return json(500, { error: 'Внутрішня помилка сервера' });
   }
 };

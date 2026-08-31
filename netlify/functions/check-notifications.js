@@ -14,6 +14,9 @@ const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY;
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:example@example.com';
 const CRON_SECRET = process.env.CRON_SECRET; // optional shared secret
 const CURRENT_ORIGIN = String(process.env.URL || process.env.DEPLOY_PRIME_URL || '').replace(/\/$/, '');
+const { processEmailQueue } = require('./lib/email-queue');
+const { atomicUpdateJSON } = require('./lib/store');
+const crypto = require('crypto');
 
 webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
 
@@ -40,104 +43,113 @@ function kyivParts() {
 
 // Runs the full reminder check for a single user's data. Nothing here is
 // ever shared across users - every key it touches is namespaced by userId.
-async function processUser(s, userId, dayIdx, curMins, dateKey) {
-  const data = await s.get(`schedule-data:${userId}`, { type: 'json' });
-  const allSubscriptions = (await s.get(`subscriptions:${userId}`, { type: 'json' })) || [];
-  // Push subscriptions are origin-bound. Legacy entries without siteOrigin are
-  // intentionally ignored so an old Netlify site cannot receive new pushes.
-  const subscriptions = allSubscriptions.filter(sub => sub && sub.siteOrigin === CURRENT_ORIGIN);
+async function claimPush(s, key) {
+  const result = await s.set(key, JSON.stringify({ claimedAt: Date.now() }), { onlyIfNew: true });
+  return !!result.modified;
+}
 
+function pushClaimKey(userId, dateKey, reminderKey, endpoint) {
+  const digest = crypto.createHash('sha256').update(String(endpoint)).digest('hex').slice(0, 24);
+  return `push-claim:${userId}:${dateKey}:${crypto.createHash('sha256').update(String(reminderKey)).digest('hex').slice(0, 24)}:${digest}`;
+}
+
+async function processUser(s, userId, dayIdx, curMins, dateKey) {
+  const data = await s.get(`schedule-data:${userId}`, { type: 'json', consistency: 'strong' });
+  const allSubscriptions = (await s.get(`subscriptions:${userId}`, { type: 'json', consistency: 'strong' })) || [];
+  const subscriptions = allSubscriptions.filter(sub => sub && sub.siteOrigin === CURRENT_ORIGIN);
   if (!data || !subscriptions.length) return { sent: 0 };
 
-  const slots = data.schedule[dayIdx] || data.schedule[String(dayIdx)] || [];
+  let slots = data.schedule?.[dayIdx] || data.schedule?.[String(dayIdx)] || [];
+  const oneOff = Array.isArray(data.oneOffLessons) ? data.oneOffLessons.filter(x => x && x.date === dateKey) : [];
+  slots = slots.concat(oneOff.map(x => ({ ...x, _oneOff: true })));
 
-  let firedLog = (await s.get(`fired-log:${userId}`, { type: 'json' })) || { dateKey: '', fired: [] };
-  if (firedLog.dateKey !== dateKey) firedLog = { dateKey, fired: [] };
-
-  const toSend = [];
+  const reminders = [];
   for (const sl of slots) {
+    if (!sl || typeof sl.time !== 'string' || !/^\d{1,2}:\d{2}$/.test(sl.time)) continue;
     const [h, m] = sl.time.split(':').map(Number);
+    if (h > 23 || m > 59) continue;
     const slotMins = h * 60 + m;
     const diff = slotMins - curMins;
     const subj = (data.subjects || []).find(x => x.id === sl.subjId) || { name: 'Пара' };
+    const lessonIdentity = String(sl.id || sl.lessonId || sl.subjId || `${sl.time}:${subj.name}`);
 
-    // Windows instead of exact-minute equality: cron-job.org occasionally
-    // fires a minute or two late, and an exact "diff === 10" check would
-    // silently skip that reminder forever if the tick landed on diff === 9.
     if (data.notif10 && diff <= 10 && diff >= 8) {
-      const key = `${sl.time}_10`;
-      if (!firedLog.fired.includes(key)) {
-        firedLog.fired.push(key);
-        toSend.push({ title: '⏰ ' + subj.name, body: `За 10 хвилин · Початок о ${sl.time}${subj.teacher ? ' · ' + subj.teacher : ''}` });
-      }
+      reminders.push({
+        key: `lesson:${lessonIdentity}:${sl.time}:10`,
+        title: '⏰ ' + subj.name,
+        body: `За 10 хвилин · Початок о ${sl.time}${subj.teacher ? ' · ' + subj.teacher : ''}`
+      });
     }
     if (data.notif5 && diff <= 5 && diff >= 3) {
-      const key = `${sl.time}_5`;
-      if (!firedLog.fired.includes(key)) {
-        firedLog.fired.push(key);
-        toSend.push({ title: '📚 ' + subj.name, body: `За 5 хвилин · Готуйся!${subj.teacher ? ' · ' + subj.teacher : ''}` });
-      }
+      reminders.push({
+        key: `lesson:${lessonIdentity}:${sl.time}:5`,
+        title: '📚 ' + subj.name,
+        body: `За 5 хвилин · Готуйся!${subj.teacher ? ' · ' + subj.teacher : ''}`
+      });
     }
   }
 
   if (Array.isArray(data.notes)) {
     const [ny, nmo, nd] = dateKey.split('-').map(Number);
     const nowWallTs = Date.UTC(ny, nmo - 1, nd, 0, 0) + curMins * 60000;
-
     for (const note of data.notes) {
       if (note.done || !note.deadline) continue;
-      const [dPart, tPart] = note.deadline.split('T');
-      const [dy, dmo, dd] = dPart.split('-').map(Number);
-      const [dh, dmi] = (tPart || '23:59').split(':').map(Number);
+      const [dPart, tPart] = String(note.deadline).split('T');
+      const [dy, dmo, dd] = String(dPart || '').split('-').map(Number);
+      const [dh, dmi] = String(tPart || '23:59').split(':').map(Number);
+      if (![dy, dmo, dd, dh, dmi].every(Number.isFinite)) continue;
       const deadlineWallTs = Date.UTC(dy, dmo - 1, dd, dh, dmi);
       const diffMin = Math.round((deadlineWallTs - nowWallTs) / 60000);
-      const shortText = (note.text || 'Нотатка').slice(0, 60);
-
-      // Same reasoning as above: a ±10-minute window (±5 for the 1h ping)
-      // instead of an exact match, so a delayed or skipped cron tick doesn't
-      // permanently swallow a deadline reminder.
-      if (diffMin <= 1440 && diffMin > 1430) {
-        const key = `note_${note.id}_24h`;
-        if (!firedLog.fired.includes(key)) { firedLog.fired.push(key); toSend.push({ title: '🔔 Дедлайн завтра', body: shortText }); }
-      } else if (diffMin <= 180 && diffMin > 170) {
-        const key = `note_${note.id}_3h`;
-        if (!firedLog.fired.includes(key)) { firedLog.fired.push(key); toSend.push({ title: '⏳ Дедлайн наближається — 3 години', body: shortText }); }
-      } else if (diffMin <= 60 && diffMin > 50) {
-        const key = `note_${note.id}_1h`;
-        if (!firedLog.fired.includes(key)) { firedLog.fired.push(key); toSend.push({ title: '🚨 Залишилась 1 година! Роби швидше', body: shortText }); }
-      } else if (diffMin <= 0) {
-        const key = `note_${note.id}_overdue_${dateKey}`;
-        if (!firedLog.fired.includes(key)) { firedLog.fired.push(key); toSend.push({ title: '⚠️ Прострочено!', body: shortText }); }
-      }
+      const shortText = String(note.text || 'Нотатка').slice(0, 60);
+      if (diffMin <= 1440 && diffMin > 1430) reminders.push({ key: `note:${note.id}:24h`, title: '🔔 Дедлайн завтра', body: shortText });
+      else if (diffMin <= 180 && diffMin > 170) reminders.push({ key: `note:${note.id}:3h`, title: '⏳ Дедлайн наближається — 3 години', body: shortText });
+      else if (diffMin <= 60 && diffMin > 50) reminders.push({ key: `note:${note.id}:1h`, title: '🚨 Залишилась 1 година! Роби швидше', body: shortText });
+      else if (diffMin <= 0) reminders.push({ key: `note:${note.id}:overdue:${dateKey}`, title: '⚠️ Прострочено!', body: shortText });
     }
   }
 
-  if (toSend.length) {
-    await s.setJSON(`fired-log:${userId}`, firedLog);
-
-    const stillValid = [];
-    for (const sub of subscriptions) {
-      let ok = true;
-      for (const msg of toSend) {
-        try {
-          await webpush.sendNotification(sub, JSON.stringify(msg));
-        } catch (err) {
-          if (err.statusCode === 404 || err.statusCode === 410) ok = false;
+  let sent = 0;
+  const validSubscriptions = [];
+  for (const sub of subscriptions) {
+    let keep = true;
+    for (const msg of reminders) {
+      const claimKey = pushClaimKey(userId, dateKey, msg.key, sub.endpoint);
+      const claimed = await claimPush(s, claimKey);
+      if (!claimed) continue;
+      try {
+        await webpush.sendNotification(sub, JSON.stringify({ title: msg.title, body: msg.body }));
+        sent++;
+        await atomicUpdateJSON(`fired-log:${userId}`, { dateKey, fired: [] }, current => {
+          const next = current.dateKey === dateKey ? current : { dateKey, fired: [] };
+          if (!next.fired.includes(msg.key)) next.fired.push(msg.key);
+          return { dateKey, fired: next.fired.slice(-1000) };
+        }).catch(() => {});
+      } catch (err) {
+        if (err.statusCode === 404 || err.statusCode === 410) {
+          keep = false;
+        } else {
+          // Temporary failure: release this subscription/message claim so the
+          // next cron tick can retry it. Successful subscriptions remain claimed.
+          await s.delete(claimKey).catch(() => {});
         }
       }
-      if (ok) stillValid.push(sub);
     }
-    if (stillValid.length !== subscriptions.length) {
-      await s.setJSON(`subscriptions:${userId}`, stillValid);
-    }
+    if (keep) validSubscriptions.push(sub);
   }
 
-  return { sent: toSend.length };
+  if (validSubscriptions.length !== allSubscriptions.length) {
+    await atomicUpdateJSON(`subscriptions:${userId}`, allSubscriptions, current => {
+      const currentList = Array.isArray(current) ? current : [];
+      const bad = new Set(allSubscriptions.filter(x => !validSubscriptions.includes(x)).map(x => x.endpoint));
+      return currentList.filter(x => !bad.has(x.endpoint));
+    }).catch(() => {});
+  }
+  return { sent };
 }
 
 exports.handler = async (event) => {
   if (CRON_SECRET) {
-    const provided = event.queryStringParameters?.secret;
+    const provided = event.headers?.['x-cron-secret'] || event.headers?.['X-Cron-Secret'] || event.queryStringParameters?.secret;
     if (provided !== CRON_SECRET) {
       return { statusCode: 401, body: 'Unauthorized' };
     }
@@ -162,12 +174,13 @@ exports.handler = async (event) => {
       users++;
     }
 
+    const emailQueue = await processEmailQueue(5).catch(() => ({ sent:0, failed:0, queued:0 }));
     return {
       statusCode: 200,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ok: true, users, sent: totalSent, dayIdx, curMins })
+      body: JSON.stringify({ ok: true, users, sent: totalSent, dayIdx, curMins, emailQueue })
     };
   } catch (err) {
-    return { statusCode: 500, body: JSON.stringify({ error: String(err) }) };
+    return { statusCode: 500, body: JSON.stringify({ error: 'Внутрішня помилка сервера' }) };
   }
 };

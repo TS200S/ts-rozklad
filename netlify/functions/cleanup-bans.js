@@ -22,6 +22,6 @@ exports.handler = async () => {
     }
     return {statusCode:200,body:JSON.stringify({ok:true,unbanned})};
   } catch(err) {
-    return {statusCode:500,body:JSON.stringify({error:String(err)})};
+    return {statusCode:500,body:JSON.stringify({error:'Внутрішня помилка сервера'})};
   }
 };
