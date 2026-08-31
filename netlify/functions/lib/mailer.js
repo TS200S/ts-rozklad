@@ -1,4 +1,6 @@
 const nodemailer = require('nodemailer');
+const { checkAndRecord } = require('./email-guard');
+const { enqueueEmail } = require('./email-queue');
 
 let transporter = null;
 function getTransporter() {
@@ -15,6 +17,12 @@ function getTransporter() {
   return transporter;
 }
 
+async function sendRawMail(to, subject, html, priority='normal') {
+  const t = getTransporter();
+  await checkAndRecord(to, priority);
+  return t.sendMail({ from: `"TS_Daily" <${process.env.GMAIL_USER}>`, to, subject, html });
+}
+
 async function sendCodeEmail(to, code, purpose) {
   const t = getTransporter();
   const isReset = purpose === 'reset';
@@ -28,6 +36,7 @@ async function sendCodeEmail(to, code, purpose) {
       <p style="color:#666;font-size:13px;margin-top:16px">Код дійсний 15 хвилин. Якщо листа немає у «Вхідних», обов’язково перевір папку «Спам» або «Небажана пошта». Якщо це був не ти — просто проігноруй цей лист.</p>
     </div>`;
 
+  await checkAndRecord(to, purpose);
   await t.sendMail({
     from: `"TS_Daily" <${process.env.GMAIL_USER}>`,
     to,
@@ -47,6 +56,7 @@ async function sendLoginCodeEmail(to, code) {
       <div style="font-size:32px;font-weight:900;letter-spacing:6px;background:#f0f4ff;padding:16px;border-radius:12px;text-align:center;color:#1e293b">${code}</div>
       <p style="color:#666;font-size:13px;margin-top:16px">Код дійсний 15 хвилин. Якщо це був не ти — не вводь код і зміни пароль.</p>
     </div>`;
+  await checkAndRecord(to, 'login');
   await t.sendMail({ from: `"TS_Daily" <${process.env.GMAIL_USER}>`, to, subject: 'Підтвердження нового входу — TS_Daily', html });
 }
 
@@ -64,6 +74,7 @@ async function sendNewDeviceAlertEmail(to, info = {}) {
       </div>
       <p style="color:#666;font-size:13px;margin-top:16px">Якщо це були не ви, негайно змініть пароль і завершіть підозрілі сесії в налаштуваннях безпеки.</p>
     </div>`;
+  await checkAndRecord(to, 'security');
   await t.sendMail({ from: `"TS_Daily" <${process.env.GMAIL_USER}>`, to, subject: 'Новий вхід до акаунта — TS_Daily', html });
 }
 
@@ -78,6 +89,7 @@ async function sendAdminRecoveryEmail(to, code) {
       <div style="font-size:32px;font-weight:900;letter-spacing:6px;background:#f0f4ff;padding:16px;border-radius:12px;text-align:center;color:#1e293b">${code}</div>
       <p style="color:#666;font-size:13px;margin-top:16px">Якщо ви не зверталися до адміністрації щодо відновлення акаунта — проігноруйте цей лист.</p>
     </div>`;
+  await checkAndRecord(to, 'recovery');
   await t.sendMail({ from: `"TS_Daily" <${process.env.GMAIL_USER}>`, to, subject: 'Оновлення пошти для відновлення акаунта — TS_Daily', html });
 }
 
@@ -96,6 +108,7 @@ async function sendAdmin2FACodeEmail(to, code, purpose = 'critical') {
       <div style="font-size:32px;font-weight:900;letter-spacing:6px;background:#f0f4ff;padding:16px;border-radius:12px;text-align:center;color:#1e293b">${code}</div>
       <p style="color:#666;font-size:13px;margin-top:16px">Код дійсний 10 хвилин. Не передавай цей код іншим особам. Якщо ти не виконував цю дію — проігноруй лист і перевір безпеку адмінського акаунта.</p>
     </div>`;
+  await checkAndRecord(to, purpose === 'setup' ? 'security' : '2fa');
   await t.sendMail({ from: `"TS_Daily" <${process.env.GMAIL_USER}>`, to, subject: `${title} — TS_Daily`, html });
 }
 
@@ -111,7 +124,15 @@ async function sendAdminEmergencyRecoveryEmail(to, code) {
       <div style="font-size:32px;font-weight:900;letter-spacing:6px;background:#f0f4ff;padding:16px;border-radius:12px;text-align:center;color:#1e293b">${code}</div>
       <p style="color:#666;font-size:13px;margin-top:16px">Код дійсний 10 хвилин і одноразовий. Якщо ви не запитували відновлення — проігноруйте цей лист та перевірте безпеку акаунта.</p>
     </div>`;
+  await checkAndRecord(to, 'recovery');
   await t.sendMail({ from: `"TS_Daily" <${process.env.GMAIL_USER}>`, to, subject: 'Аварійне відновлення паролю адмінки — TS_Daily', html });
 }
 
-module.exports = { sendCodeEmail, sendLoginCodeEmail, sendNewDeviceAlertEmail, sendAdminRecoveryEmail, sendAdmin2FACodeEmail, sendAdminEmergencyRecoveryEmail };
+async function sendRegistrationSuccessEmail(to, info = {}) {
+  const t = getTransporter();
+  const esc = v => String(v ?? '').replace(/[<>]/g,'');
+  const html = `<div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:24px"><div style="font-size:11px;font-weight:900;letter-spacing:2px;color:#64748b">TS_Daily</div><h2 style="color:#2563eb">Реєстрацію успішно завершено</h2><p style="color:#334155">Вітаємо, <b>${esc(info.nickname)}</b>! Ваш обліковий запис TS_Daily успішно створено.</p><div style="background:#f8fafc;border-radius:12px;padding:14px;font-size:13px"><b>Логін:</b> ${esc(info.username)}<br><b>Нікнейм:</b> ${esc(info.nickname)}<br><b>Дата реєстрації:</b> ${new Date(info.at||Date.now()).toLocaleString('uk-UA')}</div><p style="color:#666;font-size:13px">Якщо це були не ви — змініть пароль та зверніться до адміністрації TS_Daily.</p></div>`;
+  await enqueueEmail({to,subject:'Реєстрацію успішно завершено — TS_Daily',html,priority:'normal',dedupeKey:`registration:${to}:${info.at||Date.now()}`});
+}
+
+module.exports = { sendCodeEmail, sendLoginCodeEmail, sendNewDeviceAlertEmail, sendAdminRecoveryEmail, sendAdmin2FACodeEmail, sendAdminEmergencyRecoveryEmail, sendRegistrationSuccessEmail, sendRawMail };

@@ -1,12 +1,13 @@
 const crypto = require('crypto');
+const net = require('net');
+const { store, atomicUpdateJSON } = require('./store');
 
 function getClientIp(event) {
   const h = event.headers || {};
   const direct = h['x-nf-client-connection-ip'] || h['X-Nf-Client-Connection-Ip'];
-  if (direct) return String(direct).trim();
   const forwarded = h['x-forwarded-for'] || h['X-Forwarded-For'];
-  if (forwarded) return String(forwarded).split(',')[0].trim();
-  return 'unknown';
+  const candidate = direct ? String(direct).trim() : (forwarded ? String(forwarded).split(',')[0].trim() : '');
+  return net.isIP(candidate) ? candidate : 'unknown';
 }
 
 function getUserAgent(event) {
@@ -32,13 +33,12 @@ function parseDevice(userAgent) {
   let type = '💻 Комп’ютер';
   if (/iPhone|Android.*Mobile|Mobile/i.test(ua)) type = '📱 Телефон';
   else if (/iPad|Tablet/i.test(ua)) type = '📱 Планшет';
-
   return { os, browser, type };
 }
 
 async function isIpBanned(s, ip) {
   if (!ip || ip === 'unknown') return null;
-  const ban = await s.get(`ip-ban:${ip}`, { type: 'json' }).catch(() => null);
+  const ban = await s.get(`ip-ban:${ip}`, { type: 'json', consistency: 'strong' }).catch(() => null);
   if (!ban) return null;
   if (ban.expiresAt && ban.expiresAt <= Date.now()) {
     await s.delete(`ip-ban:${ip}`).catch(() => {});
@@ -48,21 +48,23 @@ async function isIpBanned(s, ip) {
 }
 
 async function enforceIpBan(s, event) {
-  const ip = getClientIp(event);
-  return await isIpBanned(s, ip);
+  return isIpBanned(s, getClientIp(event));
 }
 
 async function rateLimit(s, key, limit, windowMs) {
   const now = Date.now();
-  const rec = (await s.get(`rate:${key}`, { type: 'json' }).catch(() => null)) || { hits: [] };
-  rec.hits = (Array.isArray(rec.hits) ? rec.hits : []).filter(t => now - t < windowMs);
-  if (rec.hits.length >= limit) {
-    const retryAfter = Math.max(1, Math.ceil((windowMs - (now - rec.hits[0])) / 1000));
-    await s.setJSON(`rate:${key}`, rec);
+  const result = await atomicUpdateJSON(`rate:${key}`, { hits: [], lastAttemptAt: 0, lastAllowed: false }, (rec) => {
+    const hits = (Array.isArray(rec.hits) ? rec.hits : []).filter(t => now - Number(t) < windowMs);
+    if (hits.length >= limit) return { hits, lastAttemptAt: now, lastAllowed: false };
+    hits.push(now);
+    return { hits, lastAttemptAt: now, lastAllowed: true };
+  }, { store: s });
+  const hits = result.value.hits;
+  const allowed = result.value.lastAttemptAt === now && result.value.lastAllowed === true;
+  if (!allowed) {
+    const retryAfter = Math.max(1, Math.ceil((windowMs - (now - Number(hits[0] || now))) / 1000));
     return { allowed: false, retryAfter };
   }
-  rec.hits.push(now);
-  await s.setJSON(`rate:${key}`, rec);
   return { allowed: true, retryAfter: 0 };
 }
 
@@ -89,4 +91,18 @@ function hashIpForLog(ip) {
   return crypto.createHash('sha256').update(String(ip)).digest('hex').slice(0, 16);
 }
 
-module.exports = { getClientIp, getUserAgent, parseDevice, isIpBanned, enforceIpBan, rateLimit, protectCodeAttempt, hashCode, safeCodeEqual, hashIpForLog };
+function isSameOriginRequest(event) {
+  const origin = String(event?.headers?.origin || event?.headers?.Origin || '').trim();
+  if (!origin) return true;
+  const allowed = new Set([
+    String(process.env.URL || '').replace(/\/$/, ''),
+    String(process.env.DEPLOY_PRIME_URL || '').replace(/\/$/, '')
+  ].filter(Boolean));
+  return allowed.size === 0 || allowed.has(origin);
+}
+
+module.exports = {
+  getClientIp, getUserAgent, parseDevice, isIpBanned, enforceIpBan,
+  rateLimit, protectCodeAttempt, hashCode, safeCodeEqual, hashIpForLog,
+  isSameOriginRequest
+};

@@ -1,18 +1,13 @@
 const crypto = require('crypto');
+const { atomicUpdateJSON } = require('./store');
 
 const ACTIVITY_LIMIT = 1000;
 
 async function recordActivity(s, userId, type, details = {}) {
   if (!userId) return;
   const key = `account-activity:${userId}`;
-  const list = (await s.get(key, { type: 'json' }).catch(() => null)) || [];
-  list.push({
-    id: crypto.randomUUID(),
-    at: Date.now(),
-    type: String(type || 'unknown').slice(0, 80),
-    details: sanitize(details)
-  });
-  await s.setJSON(key, list.slice(-ACTIVITY_LIMIT)).catch(() => {});
+  const item = { id: crypto.randomUUID(), at: Date.now(), type: String(type || 'unknown').slice(0, 80), details: sanitize(details) };
+  await atomicUpdateJSON(key, [], list => [...(Array.isArray(list) ? list : []), item].slice(-ACTIVITY_LIMIT), { store: s }).catch(() => {});
 }
 
 function sanitize(value) {
@@ -29,7 +24,7 @@ function sanitize(value) {
 }
 
 async function listActivity(s, userId, limit = 500) {
-  const list = (await s.get(`account-activity:${userId}`, { type: 'json' }).catch(() => null)) || [];
+  const list = (await s.get(`account-activity:${userId}`, { type: 'json', consistency: 'strong' }).catch(() => null)) || [];
   return list.slice(-Math.min(Math.max(Number(limit) || 500, 1), 1000)).reverse();
 }
 
