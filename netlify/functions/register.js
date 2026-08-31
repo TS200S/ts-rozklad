@@ -121,11 +121,15 @@ exports.handler = async (event) => {
 
       // Re-check uniqueness in case someone else grabbed the login/email
       // while this code was pending.
-      const existingUser = await s.get(`user:${pending.username}`, { type: 'json' }).catch(() => null);
-      if (existingUser) {
-        await s.delete(`pending-reg:${mail}`).catch(() => {});
-        return { statusCode: 409, body: JSON.stringify({ error: 'Цей логін щойно зайняли, зареєструйся ще раз' }) };
-      }
+      const registrationClaimKey = `register-claim:${mail}`;
+      const registrationClaim = await s.set(registrationClaimKey, JSON.stringify({ at: Date.now() }), { onlyIfNew: true });
+      if (!registrationClaim.modified) return { statusCode: 409, body: JSON.stringify({ error: 'Ця реєстрація вже обробляється. Спробуй ще раз через хвилину.' }) };
+      try {
+        const existingUser = await s.get(`user:${pending.username}`, { type: 'json' }).catch(() => null);
+        if (existingUser) {
+          await s.delete(`pending-reg:${mail}`).catch(() => {});
+          return { statusCode: 409, body: JSON.stringify({ error: 'Цей логін щойно зайняли, зареєструйся ще раз' }) };
+        }
 
       const userId = crypto.randomUUID();
       const userRecord = {
@@ -149,6 +153,9 @@ exports.handler = async (event) => {
         statusCode: 200,
         headers: { 'Content-Type': 'application/json', 'Set-Cookie': sessionCookie(token) }, body: JSON.stringify({ ok: true, userId, username: pending.username, nickname: pending.nickname || pending.username, expiresAt })
       };
+      } finally {
+        await s.delete(registrationClaimKey).catch(() => {});
+      }
     }
 
     return { statusCode: 400, body: JSON.stringify({ error: 'Невідома дія' }) };

@@ -9,7 +9,7 @@ exports.handler = async event => {
   try {
     const s = store();
     const sess = await validateSession(s, extractToken(event), event);
-    if (!sess) return { statusCode: 403, body: JSON.stringify({ error: 'Доступ заборонено' }) };
+    if (!sess || sess.banned) return { statusCode: 401, body: JSON.stringify({ error: 'Сесія недійсна', sessionExpired: true }) };
     const user = await s.get(`user:${sess.username}`, { type: 'json' }).catch(() => null);
     const master = String(process.env.ADMIN_USERNAME || '').trim().toLowerCase();
     if (!user || !(user.role === 'admin' || String(user.username).toLowerCase() === master)) return { statusCode: 403, body: JSON.stringify({ error: 'Доступ заборонено' }) };

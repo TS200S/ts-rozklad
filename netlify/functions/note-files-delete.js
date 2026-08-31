@@ -9,7 +9,7 @@ exports.handler = async event => {
   try {
     const s = store();
     const sess = await validateSession(s, extractToken(event), event);
-    if (!sess) return { statusCode: 401, body: JSON.stringify({ error: 'Сесія недійсна' }) };
+    if (!sess || sess.banned) return { statusCode: 401, body: JSON.stringify({ error: 'Сесія недійсна' }) };
     const rl = await rateLimit(s, `file-delete:${sess.userId}`, 30, 60 * 60 * 1000);
     if (!rl.allowed) return { statusCode: 429, body: JSON.stringify({ error: 'Забагато операцій з файлами. Спробуй пізніше.' }) };
     const { id } = JSON.parse(event.body || '{}');
@@ -28,7 +28,8 @@ exports.handler = async event => {
       const d = await s.get(`schedule-data:${sess.userId}`, { type: 'json', consistency: 'strong' });
       if (!(d?.notes || []).some(n => (n.attachments || []).some(a => a.id === meta.id))) return { statusCode: 403, body: JSON.stringify({ error: 'Немає доступу' }) };
 
-      await s.delete(meta.blobKey);
+      // Remove references first. If physical blob deletion fails afterwards,
+      // the orphan-cleanup job can safely remove the unreferenced blob.
       await atomicUpdateJSON(`file-meta:${sess.userId}`, all, current => (Array.isArray(current) ? current : []).filter(x => x.id !== meta.id));
       await atomicUpdateJSON(`schedule-data:${sess.userId}`, d, current => {
         const next = current || d;
@@ -36,6 +37,7 @@ exports.handler = async event => {
         const updatedNotes = notes.map(n => ({ ...n, attachments: (n.attachments || []).filter(a => a.id !== meta.id) }));
         return { ...next, notes: updatedNotes, updatedAt: Date.now() };
       });
+      await s.delete(meta.blobKey).catch(() => {});
       await recordActivity(s, sess.userId, 'note-file-deleted', { fileId: meta.id, noteId: meta.noteId, name: meta.name, size: meta.size });
       return { statusCode: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }, body: JSON.stringify({ ok: true }) };
     } finally {

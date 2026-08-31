@@ -8,7 +8,7 @@ const { sendAdminRecoveryEmail, sendAdmin2FACodeEmail, sendAdminEmergencyRecover
 const { protectCodeAttempt, safeCodeEqual, hashCode } = require('./lib/security');
 
 function json(statusCode, body) {
-  return { statusCode, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) };
+  return { statusCode, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }, body: JSON.stringify(body) };
 }
 
 async function requireAdmin(event, s, options = {}) {
@@ -365,7 +365,11 @@ exports.handler = async (event) => {
 
     const criticalActions = new Set(['revoke-session','revoke-all-sessions','ban-user','unban-user','delete-user','update-email','confirm-admin-email','clear-account-history','set-role','ip-ban','ip-unban','storage-delete-orphans']);
     const admin = await requireAdmin(event, s, { stepUp: criticalActions.has(action) });
-    if (!admin) return json(403, { error: 'Немає доступу' });
+    if (!admin) {
+      const token = extractToken(event);
+      if (!token) return json(401, { error: 'Сесія не знайдена. Увійди в TS_Daily ще раз.', sessionExpired: true });
+      return json(403, { error: 'Сесія недійсна або акаунт не має прав адміністратора.', adminAccessDenied: true });
+    }
     if (admin.requiresAdminReauth) return json(428, { error: 'Потрібне повторне підтвердження пароля адміністратора', requiresAdminReauth: true });
 
     if (action === 'storage-delete-orphans') { const { blobs } = await s.list({prefix:'file:'}); let deleted=0; for(const b of blobs){const parts=b.key.split(':');const uid=parts[1],id=parts.slice(2).join(':');const list=await s.get(`file-meta:${uid}`,{type:'json'}).catch(()=>[]);if(!Array.isArray(list)||!list.some(x=>x.id===id)){await s.delete(b.key);deleted++;}} await auditAdmin(s,admin,'storage-delete-orphans',{deleted}); return json(200,{ok:true,deleted}); }
@@ -376,16 +380,18 @@ exports.handler = async (event) => {
       const integrity = await verifyAuditLog(s);
       const adminEmailVerified = admin.user.emailVerified === true && !!admin.user.email;
       const cronConfigured = !!String(process.env.CRON_SECRET || '').trim();
+      const adminPasswordConfigured = !!(admin.user.adminPasswordHash && admin.user.adminPasswordSalt);
+      const admin2faConfigured = adminEmailVerified && adminPasswordConfigured;
       const storeOk = Array.isArray(auditLog);
 
       checks.push({ id:'storage', label:'Netlify Blobs / сховище', status:storeOk?'PASS':'FAIL', detail:storeOk?'Сховище доступне для читання.':'Не вдалося прочитати службові дані.' });
       checks.push({ id:'audit', label:'Цілісність журналу адміністратора', status:integrity.valid?'PASS':'FAIL', detail:integrity.valid?`Перевірено записів: ${integrity.count || 0}.`:`Порушення біля запису ${integrity.brokenId || 'невідомо'}.` });
       checks.push({ id:'admin-email', label:'Підтверджена пошта адміністратора', status:adminEmailVerified?'PASS':'WARN', detail:adminEmailVerified?'Пошта підтверджена та доступна для 2FA/відновлення.':'Потрібна підтверджена пошта адміністратора.' });
-      checks.push({ id:'admin-password', label:'Окремий пароль адмінки', status:admin.user.adminPasswordHash && admin.user.adminPasswordSalt?'PASS':'WARN', detail:admin.user.adminPasswordHash?'Окремий пароль налаштований.':'Пароль адмінки ще не налаштований.' });
-      checks.push({ id:'cron', label:'CRON_SECRET', status:cronConfigured?'PASS':'WARN', detail:cronConfigured?'Секрет налаштований (значення не показується).':'CRON_SECRET не налаштований.' });
+      checks.push({ id:'admin-password', label:'Окремий пароль адмінки', status:adminPasswordConfigured?'PASS':'WARN', detail:adminPasswordConfigured?'Окремий пароль налаштований.':'Пароль адмінки ще не налаштований.' });
+      checks.push({ id:'cron', label:'CRON_SECRET', status:cronConfigured?'PASS':'FAIL', detail:cronConfigured?'Секрет налаштований (значення не показується).':'CRON_SECRET обов’язковий для захисту cron endpoint.' });
       checks.push({ id:'session-cookie', label:'HttpOnly session cookie', status:'PASS', detail:'Сервер використовує __Host-ts_session з Secure, HttpOnly та SameSite=Lax.' });
       checks.push({ id:'device-binding', label:'Прив’язка сесії до пристрою', status:'PASS', detail:'Сесія перевіряє deviceId та User-Agent.' });
-      checks.push({ id:'2fa', label:'Email 2FA для критичних дій', status:'PASS', detail:'Критичні адміністративні дії захищені step-up + email-кодом.' });
+      checks.push({ id:'2fa', label:'Email 2FA для критичних дій', status:admin2faConfigured?'PASS':'WARN', detail:admin2faConfigured?'Критичні адміністративні дії захищені окремим паролем + email-кодом.':'Для повного захисту потрібні підтверджена пошта та окремий пароль адмінки.' });
       checks.push({ id:'bruteforce', label:'Захист від перебору', status:'PASS', detail:'Для повторного підтвердження та кодів використовується rate limit.' });
       checks.push({ id:'sensitive-logs', label:'Секрети не записуються в аудит', status:'PASS', detail:'Паролі, токени та коди не передаються в audit payload.' });
       const emailDaily=Number(process.env.EMAIL_SAFE_DAILY_LIMIT||400); const emailMinute=Number(process.env.EMAIL_SAFE_MINUTE_LIMIT||8);
@@ -396,9 +402,11 @@ exports.handler = async (event) => {
     }
 
     if (action === 'list-users') {
-      const { blobs } = await s.list({ prefix: 'user:' });
+      const listed = await s.list({ prefix: 'user:' });
+      const blobs = Array.isArray(listed?.blobs) ? listed.blobs : [];
       const users = [];
       for (const b of blobs) {
+        if (!b || typeof b.key !== 'string' || !b.key.startsWith('user:')) continue;
         const u = await s.get(b.key, { type: 'json' }).catch(() => null);
         if (!u) continue;
         if (u.banned && Number(u.banExpiresAt || 0) && Number(u.banExpiresAt) <= Date.now()) {
@@ -410,11 +418,12 @@ exports.handler = async (event) => {
             if (mark?.username === u.username) await s.delete(rb.key).catch(()=>{});
           }
         }
-        const sessions = await listSessionsForUser(s, u.userId);
-        const schedData = await s.get(`schedule-data:${u.userId}`, { type: 'json' }).catch(() => null);
-        const allSubs = (await s.get(`subscriptions:${u.userId}`, { type: 'json' }).catch(() => null)) || [];
+        const sessions = u.userId ? await listSessionsForUser(s, u.userId).catch(() => []) : [];
+        const schedData = u.userId ? await s.get(`schedule-data:${u.userId}`, { type: 'json' }).catch(() => null) : null;
+        const rawSubs = u.userId ? await s.get(`subscriptions:${u.userId}`, { type: 'json' }).catch(() => null) : null;
+        const allSubs = Array.isArray(rawSubs) ? rawSubs : [];
         const currentOrigin = String(process.env.URL || process.env.DEPLOY_PRIME_URL || '').replace(/\/$/, '');
-        const subs = allSubs.filter(sub => sub && sub.siteOrigin === currentOrigin);
+        const subs = currentOrigin ? allSubs.filter(sub => sub && sub.siteOrigin === currentOrigin) : allSubs.filter(Boolean);
         users.push({
           username: u.username, nickname: u.nickname || u.username, email: u.email || null, emailVerified: u.emailVerified === true,
           role: isMasterUsername(u.username, admin.master) ? 'master' : (u.role || 'user'), isMaster: isMasterUsername(u.username, admin.master), createdAt: u.createdAt || null, lastActive: u.lastActive || null,
@@ -696,6 +705,8 @@ exports.handler = async (event) => {
 
     return json(400, { error: 'Невідома дія' });
   } catch (err) {
-    return json(500, { error: 'Внутрішня помилка сервера' });
+    const requestId = crypto.randomUUID();
+    console.error('[admin]', requestId, err && err.stack ? err.stack : err);
+    return json(500, { error: 'Внутрішня помилка сервера', requestId });
   }
 };

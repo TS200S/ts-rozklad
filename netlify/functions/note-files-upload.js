@@ -37,7 +37,7 @@ exports.handler = async event => {
     const ban = await enforceIpBan(s, event);
     if (ban) return { statusCode: 403, body: JSON.stringify({ error: 'IP заблоковано' }) };
     const sess = await validateSession(s, extractToken(event), event);
-    if (!sess) return { statusCode: 401, body: JSON.stringify({ error: 'Сесія недійсна' }) };
+    if (!sess || sess.banned) return { statusCode: 401, body: JSON.stringify({ error: 'Сесія недійсна' }) };
     const rl = await rateLimit(s, `file-upload:${sess.userId}`, 20, 60 * 60 * 1000);
     if (!rl.allowed) return { statusCode: 429, body: JSON.stringify({ error: 'Забагато завантажень. Спробуй пізніше.' }) };
 
@@ -46,13 +46,18 @@ exports.handler = async event => {
     const data = await s.get(`schedule-data:${sess.userId}`, { type: 'json', consistency: 'strong' });
     const note = (data?.notes || []).find(n => n.id === noteId);
     if (!note) return { statusCode: 404, body: JSON.stringify({ error: 'Нотатку не знайдено' }) };
+    const attachmentCount = Array.isArray(note.attachments) ? note.attachments.length : 0;
+    if (attachmentCount >= 20) return { statusCode: 413, body: JSON.stringify({ error: 'Для однієї нотатки можна прикріпити максимум 20 файлів.' }) };
 
     let rawName = event.headers?.['x-file-name'] || event.headers?.['X-File-Name'] || 'file';
     try { rawName = decodeURIComponent(rawName); } catch {}
     const name = safeName(rawName);
     const mime = String(event.headers?.['content-type'] || event.headers?.['Content-Type'] || '').split(';')[0].toLowerCase();
-    const bytes = Buffer.from(event.body || '', event.isBase64Encoded ? 'base64' : 'utf8');
-    if (!bytes.length || bytes.length > MAX_FILE) return { statusCode: 413, body: JSON.stringify({ error: 'Файл завеликий. Максимум 4 МБ.' }) };
+    const body = event.body || '';
+    // Netlify encodes binary function bodies as base64. Refuse an ambiguous
+    // binary upload instead of silently UTF-8 re-encoding it.
+    const bytes = event.isBase64Encoded ? Buffer.from(body, 'base64') : Buffer.from(body, 'utf8');
+    if (!event.body || !bytes.length || bytes.length > MAX_FILE) return { statusCode: 413, body: JSON.stringify({ error: 'Файл завеликий. Максимум 4 МБ.' }) };
     if (!ALLOWED.has(mime)) return { statusCode: 415, body: JSON.stringify({ error: 'Тип файлу не дозволений.' }) };
     if (!hasMagic(bytes, mime)) return { statusCode: 415, body: JSON.stringify({ error: 'Вміст файлу не відповідає заявленому типу.' }) };
 
@@ -61,6 +66,7 @@ exports.handler = async event => {
     const meta = { id, noteId, name, mime, size: bytes.length, createdAt: Date.now(), blobKey };
     await s.set(blobKey, bytes, { metadata: { userId: sess.userId, noteId, name, mime, size: bytes.length, createdAt: meta.createdAt } });
 
+    let metaAdded = false;
     try {
       const metaResult = await atomicUpdateJSON(`file-meta:${sess.userId}`, [], current => {
         const list = Array.isArray(current) ? current : [];
@@ -72,13 +78,16 @@ exports.handler = async event => {
         }
         return [...list, meta];
       });
+      metaAdded = true;
 
       await atomicUpdateJSON(`schedule-data:${sess.userId}`, data, current => {
         const next = current || data;
         const notes = Array.isArray(next.notes) ? next.notes : [];
         const idx = notes.findIndex(n => n.id === noteId);
         if (idx < 0) { const err = new Error('NOTE_GONE'); err.code = 'NOTE_GONE'; throw err; }
-        const updated = { ...notes[idx], attachments: [...(notes[idx].attachments || []), { id, name, mime, size: bytes.length }] };
+        const currentAttachments = Array.isArray(notes[idx].attachments) ? notes[idx].attachments : [];
+        if (currentAttachments.length >= 20) { const err = new Error('NOTE_FILE_LIMIT'); err.code = 'NOTE_FILE_LIMIT'; throw err; }
+        const updated = { ...notes[idx], attachments: [...currentAttachments, { id, name, mime, size: bytes.length }] };
         const nextNotes = [...notes];
         nextNotes[idx] = updated;
         return { ...next, notes: nextNotes, updatedAt: Date.now() };
@@ -87,7 +96,11 @@ exports.handler = async event => {
       return { statusCode: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }, body: JSON.stringify({ ok: true, file: { id, name, mime, size: bytes.length } }) };
     } catch (err) {
       await s.delete(blobKey).catch(() => {});
+      if (metaAdded) {
+        await atomicUpdateJSON(`file-meta:${sess.userId}`, [], current => (Array.isArray(current) ? current : []).filter(x => x.id !== id)).catch(() => {});
+      }
       if (err.code === 'STORAGE_LIMIT') return { statusCode: 413, body: JSON.stringify({ error: 'Ліміт сховища користувача вичерпано.' }) };
+      if (err.code === 'NOTE_FILE_LIMIT') return { statusCode: 413, body: JSON.stringify({ error: 'Для однієї нотатки можна прикріпити максимум 20 файлів.' }) };
       return { statusCode: 409, body: JSON.stringify({ error: 'Нотатку або файл одночасно змінили. Спробуй ще раз.' }) };
     }
   } catch {

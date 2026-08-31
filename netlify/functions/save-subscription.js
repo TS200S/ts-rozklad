@@ -1,4 +1,4 @@
-const { store } = require('./lib/store');
+const { store, atomicUpdateJSON } = require('./lib/store');
 const { validateSession, extractToken } = require('./lib/session');
 const { enforceIpBan, isSameOriginRequest } = require('./lib/security');
 
@@ -30,17 +30,16 @@ exports.handler = async (event) => {
     }
 
     const key = `subscriptions:${userId}`;
-    const existing = (await s.get(key, { type: 'json' })) || [];
-
-    let updated;
-    if (action === 'unsubscribe') {
-      updated = existing.filter(sub => sub.endpoint !== subscription.endpoint);
-    } else {
-      updated = existing.filter(sub => sub.endpoint !== subscription.endpoint);
+    const result = await atomicUpdateJSON(key, [], current => {
+      const existing = Array.isArray(current) ? current : [];
+      if (action === 'unsubscribe') {
+        return existing.filter(sub => sub && sub.endpoint !== subscription.endpoint);
+      }
+      const updated = existing.filter(sub => sub && sub.endpoint !== subscription.endpoint);
       updated.push({ ...subscription, siteOrigin: currentOrigin || null, savedAt: Date.now() });
-    }
-
-    await s.setJSON(key, updated);
+      return updated.slice(-20);
+    }, { store: s });
+    const updated = Array.isArray(result.value) ? result.value : [];
 
     return {
       statusCode: 200,

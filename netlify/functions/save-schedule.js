@@ -28,15 +28,8 @@ exports.handler = async (event) => {
       return {schedule,subjects:safeSubjects,notes:newNotes,oneOffLessons:safeOneOff,notif10:cfg?.notif10!==false,notif5:cfg?.notif5!==false,updatedAt:Date.now()};
     });
 
-    // Reconcile only after the schedule write succeeds. A concurrent file upload
-    // changes schedule-data and therefore either becomes visible to this CAS or
-    // causes the save to conflict instead of silently deleting the new file.
-    const referenced=new Set(newNotes.flatMap(n=>(n.attachments||[]).map(a=>a.id)));
-    const metaKey=`file-meta:${sess.userId}`;
-    const oldMetas=(await s.get(metaKey,{type:'json',consistency:'strong'}).catch(()=>null))||[];
-    const removed=oldMetas.filter(m=>m?.id&&!referenced.has(m.id));
-    await atomicUpdateJSON(metaKey, oldMetas, list => (Array.isArray(list)?list:[]).filter(m=>m?.id&&referenced.has(m.id)));
-    for(const meta of removed){if(meta?.blobKey)await s.delete(meta.blobKey).catch(()=>{});}
+    // Whole-note deletions are reconciled by the admin orphan cleanup. We do not
+    // mutate file metadata here because a concurrent upload may be in flight.
 
     return{statusCode:200,headers:{'Content-Type':'application/json','Cache-Control':'no-store'},body:JSON.stringify({ok:true,updatedAt:saved.value.updatedAt})};
   }catch(err){

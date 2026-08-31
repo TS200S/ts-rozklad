@@ -12,13 +12,11 @@ function store() {
 const VAPID_PUBLIC = process.env.VAPID_PUBLIC_KEY;
 const VAPID_PRIVATE = process.env.VAPID_PRIVATE_KEY;
 const VAPID_SUBJECT = process.env.VAPID_SUBJECT || 'mailto:example@example.com';
-const CRON_SECRET = process.env.CRON_SECRET; // optional shared secret
+const CRON_SECRET = String(process.env.CRON_SECRET || '').trim();
 const CURRENT_ORIGIN = String(process.env.URL || process.env.DEPLOY_PRIME_URL || '').replace(/\/$/, '');
 const { processEmailQueue } = require('./lib/email-queue');
 const { atomicUpdateJSON } = require('./lib/store');
 const crypto = require('crypto');
-
-webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
 
 function kyivParts() {
   const fmt = new Intl.DateTimeFormat('en-US', {
@@ -148,18 +146,16 @@ async function processUser(s, userId, dayIdx, curMins, dateKey) {
 }
 
 exports.handler = async (event) => {
-  if (CRON_SECRET) {
-    const provided = event.headers?.['x-cron-secret'] || event.headers?.['X-Cron-Secret'] || event.queryStringParameters?.secret;
-    if (provided !== CRON_SECRET) {
-      return { statusCode: 401, body: 'Unauthorized' };
-    }
+  if (!CRON_SECRET) return { statusCode: 503, body: 'Cron secret is not configured' };
+  const provided = String(event.headers?.['x-cron-secret'] || event.headers?.['X-Cron-Secret'] || '');
+  if (!provided || Buffer.byteLength(provided) !== Buffer.byteLength(CRON_SECRET) || !crypto.timingSafeEqual(Buffer.from(provided), Buffer.from(CRON_SECRET))) {
+    return { statusCode: 401, body: 'Unauthorized' };
   }
-
   if (!VAPID_PUBLIC || !VAPID_PRIVATE) {
-    return { statusCode: 500, body: 'VAPID keys not configured' };
+    return { statusCode: 503, body: 'VAPID keys not configured' };
   }
-
   try {
+    webpush.setVapidDetails(VAPID_SUBJECT, VAPID_PUBLIC, VAPID_PRIVATE);
     const s = store();
     const { dayIdx, minutes: curMins, dateKey } = kyivParts();
 
@@ -169,9 +165,13 @@ exports.handler = async (event) => {
     for (const blob of blobs) {
       const userId = blob.key.slice('schedule-data:'.length);
       if (!userId) continue;
-      const result = await processUser(s, userId, dayIdx, curMins, dateKey);
-      totalSent += result.sent;
-      users++;
+      try {
+        const result = await processUser(s, userId, dayIdx, curMins, dateKey);
+        totalSent += result.sent;
+        users++;
+      } catch (userErr) {
+        console.error('[check-notifications:user]', userId, userErr?.message || userErr);
+      }
     }
 
     const emailQueue = await processEmailQueue(5).catch(() => ({ sent:0, failed:0, queued:0 }));
