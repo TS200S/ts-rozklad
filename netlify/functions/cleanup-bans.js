@@ -58,6 +58,22 @@ exports.handler = async () => {
       }
     }
     }
+
+    // Remove abandoned multipart uploads and their chunks. This keeps failed or
+    // cancelled uploads from consuming Blobs storage indefinitely. We only touch
+    // upload state older than the same 2-hour TTL used by note-files-upload.
+    if (new Date().getUTCMinutes() % 15 === 0) {
+      const { blobs: uploadStates } = await s.list({ prefix: 'file-upload:' }).catch(() => ({ blobs: [] }));
+      const cutoff = Date.now() - (2 * 60 * 60 * 1000);
+      for (const b of uploadStates) {
+        const state = await s.get(b.key, { type: 'json' }).catch(() => null);
+        if (!state || Number(state.updatedAt || state.createdAt || 0) >= cutoff) continue;
+        const prefix = `file-upload-chunk:${state.userId}:${state.uploadId}:`;
+        const { blobs: chunks } = await s.list({ prefix }).catch(() => ({ blobs: [] }));
+        for (const chunk of chunks) await s.delete(chunk.key).catch(() => {});
+        await s.delete(b.key).catch(() => {});
+      }
+    }
     return {statusCode:200,headers:{'Cache-Control':'no-store'},body:JSON.stringify({ok:true,unbanned,orphanedFiles})};
   } catch(err) {
     return {statusCode:500,body:JSON.stringify({error:'Внутрішня помилка сервера'})};

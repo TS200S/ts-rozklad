@@ -3,7 +3,7 @@ const { validateSession, extractToken } = require('./lib/session');
 const { enforceIpBan, isSameOriginRequest } = require('./lib/security');
 function safeUrl(v){try{const u=new URL(String(v||''));return ['http:','https:'].includes(u.protocol)?u.toString().slice(0,1000):'';}catch{return '';}}
 function cleanText(v,n=2000){return String(v??'').slice(0,n);}
-function cleanNotes(notes){return (Array.isArray(notes)?notes:[]).slice(0,500).map(n=>({id:cleanText(n.id,120),text:cleanText(n.text,4000),deadline:/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(String(n.deadline||''))?String(n.deadline):'',done:n.done===true,createdAt:Number(n.createdAt)||Date.now(),link:safeUrl(n.link),attachments:(Array.isArray(n.attachments)?n.attachments:[]).slice(0,20).map(a=>({id:cleanText(a.id,80),name:cleanText(a.name,120),mime:cleanText(a.mime,120),size:Math.max(0,Number(a.size)||0)}))}));}
+function cleanNotes(notes){return (Array.isArray(notes)?notes:[]).slice(0,500).filter(n=>n&&typeof n==='object'&&!Array.isArray(n)).map(n=>({id:cleanText(n.id,120),text:cleanText(n.text,4000),deadline:/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(String(n.deadline||''))?String(n.deadline):'',done:n.done===true,createdAt:Number(n.createdAt)||Date.now(),link:safeUrl(n.link),attachments:(Array.isArray(n.attachments)?n.attachments:[]).slice(0,20).filter(a=>a&&typeof a==='object'&&!Array.isArray(a)).map(a=>({id:cleanText(a.id,80),name:cleanText(a.name,120),mime:cleanText(a.mime,120),size:Math.max(0,Number(a.size)||0)}))}));}
 
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode:405, body:'Method Not Allowed' };
@@ -20,8 +20,8 @@ exports.handler = async (event) => {
     if(current && baseUpdatedAt && Number(current.updatedAt||0)>baseUpdatedAt) return{statusCode:409,headers:{'Content-Type':'application/json','Cache-Control':'no-store'},body:JSON.stringify({error:'Розклад було змінено на іншому пристрої. Онови дані та спробуй ще раз.',conflict:true,updatedAt:Number(current.updatedAt||0)})};
 
     const newNotes=cleanNotes(notes);
-    const safeSubjects=subjects.slice(0,500).map(x=>({id:cleanText(x.id,120),name:cleanText(x.name,300),teacher:cleanText(x.teacher,300),room:cleanText(x.room,100),link:safeUrl(x.link)}));
-    const safeOneOff=(Array.isArray(oneOffLessons)?oneOffLessons:[]).slice(0,500).map(x=>({...x,date:/^\d{4}-\d{2}-\d{2}$/.test(String(x.date||''))?String(x.date):'',time:/^\d{2}:\d{2}$/.test(String(x.time||''))?String(x.time):'',duration:Math.min(1440,Math.max(15,Number(x.duration)||45))}));
+    const safeSubjects=subjects.slice(0,500).filter(x=>x&&typeof x==='object'&&!Array.isArray(x)).map(x=>({id:cleanText(x.id,120),name:cleanText(x.name,300),teacher:cleanText(x.teacher,300),room:cleanText(x.room,100),link:safeUrl(x.link)}));
+    const safeOneOff=(Array.isArray(oneOffLessons)?oneOffLessons:[]).slice(0,500).filter(x=>x&&typeof x==='object'&&!Array.isArray(x)).map(x=>({...x,date:/^\d{4}-\d{2}-\d{2}$/.test(String(x.date||''))?String(x.date):'',time:/^\d{2}:\d{2}$/.test(String(x.time||''))?String(x.time):'',duration:Math.min(1440,Math.max(15,Number(x.duration)||45))}));
     const saved=await atomicUpdateJSON(`schedule-data:${sess.userId}`, current || {schedule:[],subjects:[],notes:[],oneOffLessons:[]}, existing=>{
       const nowCurrent=existing||{};
       if(baseUpdatedAt && Number(nowCurrent.updatedAt||0)>baseUpdatedAt){const err=new Error('SCHEDULE_CONFLICT');err.code='SCHEDULE_CONFLICT';throw err;}
@@ -34,6 +34,6 @@ exports.handler = async (event) => {
     return{statusCode:200,headers:{'Content-Type':'application/json','Cache-Control':'no-store'},body:JSON.stringify({ok:true,updatedAt:saved.value.updatedAt})};
   }catch(err){
     if(err.code==='SCHEDULE_CONFLICT')return{statusCode:409,headers:{'Content-Type':'application/json','Cache-Control':'no-store'},body:JSON.stringify({error:'Розклад було змінено на іншому пристрої. Онови дані та спробуй ще раз.',conflict:true})};
-    return{statusCode:500,body:JSON.stringify({error:'Не вдалося зберегти розклад'})};
+    const requestId=String(event.headers?.['x-nf-request-id']||event.headers?.['X-Nf-Request-Id']||'').slice(0,80); console.error('save-schedule failed',{requestId,code:err?.code||'UNKNOWN',name:err?.name||'Error'}); return{statusCode:500,headers:{'Content-Type':'application/json','Cache-Control':'no-store'},body:JSON.stringify({error:'Не вдалося зберегти розклад',requestId:requestId||undefined})};
   }
 };
