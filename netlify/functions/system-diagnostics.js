@@ -18,7 +18,8 @@ exports.handler = async event => {
     const sess = await validateSession(s, extractToken(event), event);
     if (!sess || sess.banned) return json(401, { error: 'Сесія недійсна' });
     const user = await s.get(`user:${sess.username}`, { type: 'json', consistency: 'strong' }).catch(() => null);
-    if (!user || (user.role !== 'admin' && !user.isMaster)) return json(403, { error: 'Недостатньо прав' });
+    const master = String(process.env.ADMIN_USERNAME || '').trim().toLowerCase();
+    if (!user || !(user.role === 'admin' || String(user.username || '').toLowerCase() === master)) return json(403, { error: 'Недостатньо прав' });
     const rl = await rateLimit(s, `system-diagnostics:${sess.userId}`, 6, 10 * 60 * 1000);
     if (!rl.allowed) return json(429, { error: 'Забагато перевірок. Спробуй пізніше.' });
 
