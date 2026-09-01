@@ -1417,16 +1417,27 @@ async function saveNote(){
   }
   editingNoteId=null;
 }
+const FILE_CHUNK_SIZE=3*1024*1024;
+const FILE_MAX_SIZE=25*1024*1024;
+const FILE_MIMES=['application/pdf','text/plain','image/jpeg','image/png','image/webp','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.ms-powerpoint','application/vnd.openxmlformats-officedocument.presentationml.presentation','application/zip'];
 async function uploadNoteFiles(noteId,files){
   for(const f of files){
-    if(f.size>4*1024*1024){alert('❌ '+f.name+': максимум 4 МБ');continue;}
-    if(!f.type || !['application/pdf','text/plain','image/jpeg','image/png','image/webp','application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document','application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet','application/vnd.ms-powerpoint','application/vnd.openxmlformats-officedocument.presentationml.presentation','application/zip'].includes(f.type)){
-      alert('❌ '+f.name+': тип файлу не підтримується.'); continue;
-    }
+    if(f.size>FILE_MAX_SIZE){alert('❌ '+f.name+': максимум 25 МБ');continue;}
+    if(!f.type || !FILE_MIMES.includes(f.type)){alert('❌ '+f.name+': тип файлу не підтримується.');continue;}
     try{
-      const r=await fetch('/.netlify/functions/note-files-upload?noteId='+encodeURIComponent(noteId),{method:'POST',headers:{...authHeaders(),'Content-Type':f.type,'X-File-Name':encodeURIComponent(f.name)},body:f});
-      const d=await r.json().catch(()=>({}));
-      if(!r.ok)throw new Error(d.error||('HTTP '+r.status));
+      const init=await fetch('/.netlify/functions/note-files-upload?action=init',{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({noteId,size:f.size,mime:f.type,name:f.name})});
+      const idata=await init.json().catch(()=>({}));
+      if(!init.ok)throw new Error(idata.error||('HTTP '+init.status));
+      for(let i=0;i<idata.chunks;i++){
+        const start=i*idata.chunkSize, end=Math.min(f.size,start+idata.chunkSize);
+        const chunk=await f.slice(start,end).arrayBuffer();
+        const r=await fetch('/.netlify/functions/note-files-upload?action=chunk&uploadId='+encodeURIComponent(idata.uploadId)+'&index='+i,{method:'POST',headers:{'Content-Type':'application/x-tsdaily-chunk',...authHeaders()},body:chunk});
+        const d=await r.json().catch(()=>({}));
+        if(!r.ok)throw new Error(d.error||('HTTP '+r.status));
+      }
+      const fin=await fetch('/.netlify/functions/note-files-upload?action=finalize',{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({uploadId:idata.uploadId})});
+      const d=await fin.json().catch(()=>({}));
+      if(!fin.ok)throw new Error(d.error||('HTTP '+fin.status));
       const n=notes.find(x=>x.id===noteId);
       if(n){n.attachments=Array.isArray(n.attachments)?n.attachments:[];n.attachments.push(d.file);saveNotes();renderNotes();}
     }catch(e){alert('❌ '+f.name+': '+e.message)}
