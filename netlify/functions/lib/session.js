@@ -24,7 +24,6 @@ async function readSession(s, token) {
   const hashedKey = secureSessionKey(token);
   let sess = await s.get(hashedKey, { type: 'json' }).catch(() => null);
   if (sess) return { sess, key: hashedKey, legacy: false };
-  // One-time compatibility path for sessions created by <=5.3.0.
   const oldKey = legacySessionKey(token);
   sess = await s.get(oldKey, { type: 'json' }).catch(() => null);
   if (sess) return { sess, key: hashedKey, legacy: true, oldKey };
@@ -51,7 +50,6 @@ async function createSession(s, userId, username, meta = {}, opts = {}) {
   };
   const key = secureSessionKey(token);
   await s.setJSON(key, record);
-
   const listKey = `user-sessions:${userId}`;
   let removed = [];
   await atomicUpdateJSON(listKey, [], list => {
@@ -108,7 +106,6 @@ async function validateSession(s, token, event = null) {
     return { ...sess, banned: true, banReason: user.banReason || '', banExpiresAt };
   }
 
-  // Migrate old plaintext-token storage after a successful validation.
   if (read.legacy) {
     await s.setJSON(read.key, sess).catch(() => {});
     await s.delete(read.oldKey).catch(() => {});
@@ -117,9 +114,8 @@ async function validateSession(s, token, event = null) {
     const migrated = list.map(k => k === read.oldKey ? read.key : k);
     await s.setJSON(listKey, [...new Set(migrated)].slice(-SESSION_LIST_LIMIT)).catch(() => {});
   }
-  if (!sess.lastActive || Date.now() - sess.lastActive > 5 * 60 * 1000 || (sess.ipLastSeen !== sess.ip && sess.ip !== 'unknown')) {
+  if (!sess.lastActive || Date.now() - sess.lastActive > 5 * 60 * 1000) {
     sess.lastActive = Date.now();
-    if (sess.ipLastSeen !== sess.ip && sess.ip && sess.ip !== 'unknown') sess.ipLastSeen = sess.ip;
     await s.setJSON(read.key, sess).catch(() => {});
     user.lastActive = sess.lastActive; await s.setJSON(`user:${sess.username}`, user).catch(() => {});
   }
@@ -173,7 +169,7 @@ async function revokeSessionById(s, userId, sessionId, exceptToken = '') {
   for (const key of list) {
     if (key === exceptKey) continue;
     const sess = await s.get(key, { type: 'json' }).catch(() => null); if (!sess) continue;
-    if (String(sess.sessionId) === String(sessionId)) { const token = key.replace(/^session:/,''); /* key is hash, not token */
+    if (String(sess.sessionId) === String(sessionId)) {
       await s.delete(key).catch(() => {});
       await recordActivity(s, userId, 'session-revoked-by-user', { targetSessionId: String(sessionId).slice(0,32), reason:'user-request' }).catch(()=>{});
       const next=list.filter(x=>x!==key); if(next.length) await s.setJSON(`user-sessions:${userId}`,next); else await s.delete(`user-sessions:${userId}`);
