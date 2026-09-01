@@ -1443,7 +1443,24 @@ async function uploadNoteFiles(noteId,files){
     }catch(e){alert('❌ '+f.name+': '+e.message)}
   }
 }
-async function openNoteFile(noteId,fileId){const n=notes.find(x=>x.id===noteId);if(!n||(n.attachments||[]).every(a=>a.id!==fileId))return;window.open('/.netlify/functions/note-files-get?id='+encodeURIComponent(fileId),'_blank','noopener');}
+async function openNoteFile(noteId,fileId){
+  const n=notes.find(x=>x.id===noteId);
+  if(!n||(n.attachments||[]).every(a=>a.id!==fileId))return;
+  try{
+    const r=await fetch('/.netlify/functions/note-files-get?id='+encodeURIComponent(fileId),{credentials:'same-origin',headers:authHeaders()});
+    if(!r.ok){
+      if(r.status===401)alert('❌ Сесія недійсна. Увійди ще раз.');
+      else if(r.status===403)alert('❌ Немає доступу до цього файлу.');
+      else if(r.status===404)alert('❌ Файл не знайдено.');
+      else alert('❌ Не вдалося відкрити файл (HTTP '+r.status+')');
+      return;
+    }
+    const blob=await r.blob();
+    const url=URL.createObjectURL(blob);
+    window.open(url,'_blank','noopener');
+    setTimeout(()=>URL.revokeObjectURL(url),60000);
+  }catch(e){alert('❌ Не вдалося відкрити файл: '+(e.message||'помилка мережі'));}
+}
 async function deleteNoteFile(noteId,fileId){if(!confirm('Видалити файл із сервера? Дію не можна скасувати.'))return;try{const r=await fetch('/.netlify/functions/note-files-delete',{method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({id:fileId})});const d=await r.json();if(!r.ok)throw new Error(d.error||'Помилка');const n=notes.find(x=>x.id===noteId);if(n)n.attachments=(n.attachments||[]).filter(a=>a.id!==fileId);saveNotes();renderNotes();if(editingNoteId===noteId)openEditNote(noteId);}catch(e){alert('❌ '+e.message)}}
 async function deleteNote(){
   if(!editingNoteId)return;

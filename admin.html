@@ -138,7 +138,7 @@ function renderSecurityPanel(){
   c.innerHTML=`<div class="panel"><div class="toolbar"><button class="refresh" onclick="loadSecurityCheck()">🛡️ Запустити перевірку</button><button class="btn blue" onclick="loadSystemDiagnostics()">🧪 Самодіагностика системи</button><span class="muted" style="align-self:center">Security Center перевіряє захист; самодіагностика перевіряє реальний runtime і сховище.</span></div><div id="securityResult"><div class="state">Натисни «Запустити перевірку».</div></div></div>`;
 }
 async function loadSystemDiagnostics(){
-  const c=document.getElementById('content'); if(!c)return;
+  const c=document.getElementById('securityResult'); if(!c)return;
   c.innerHTML='<div class="panel state">🧪 Система перевіряє сама себе...</div>';
   try{
     const r=await fetch('/.netlify/functions/system-diagnostics',{cache:'no-store',credentials:'same-origin',headers:authHeaders()});
@@ -147,17 +147,17 @@ async function loadSystemDiagnostics(){
     const s=d.summary||{}, overall=s.fail?'fail':s.warn?'warn':'pass', title=s.fail?'❌ Виявлено проблему':s.warn?'⚠️ Є попередження':'✅ Система працює нормально';
     const rows=(d.checks||[]).map(x=>`<div class="security-item"><div class="top"><b>${esc(x.label)}</b><span class="badge ${x.status==='PASS'?'ok':x.status==='FAIL'?'banned':''}">${esc(x.status)}</span></div><div class="detail">${esc(x.detail||'')}</div></div>`).join('');
     c.innerHTML=`<div class="panel"><div class="toolbar"><button class="refresh" onclick="loadSystemDiagnostics()">🔄 Перевірити ще раз</button><button class="btn blue" onclick="loadSecurityCheck()">🛡️ Security Center</button><span class="muted" style="align-self:center">Request ID: ${esc(d.requestId||'—')}</span></div><div class="security-summary ${overall}"><b style="font-size:16px">${title}</b><div class="small" style="margin-top:5px">PASS: ${s.pass||0} · WARN: ${s.warn||0} · FAIL: ${s.fail||0} · Всього: ${s.total||0}</div><div class="small">Перевірено: ${fmt(d.checkedAt||Date.now())}</div></div><div class="security-grid">${rows}</div></div>`;
-  }catch(e){c.innerHTML=`<div class="panel state err">❌ ${esc(e.message)}</div>`}
+  }catch(e){c.innerHTML=`<div class="state err">❌ Самодіагностика не виконана: ${esc(e.message||'Невідома помилка')}</div>`}
 }
 async function loadSecurityCheck(){
-  const c=document.getElementById('content');
+  const c=document.getElementById('securityResult');
   if(!c){render();return loadSecurityCheck()}
   c.innerHTML=`<div class="panel"><div class="state">🛡️ Виконується перевірка безпеки...</div></div>`;
   const checks=[];
   try{
     const d=await callAdmin('security-check');
     checks.push(...(d.checks||[]));
-  }catch(e){c.innerHTML=`<div class="panel state err">❌ Не вдалося виконати серверну перевірку: ${esc(e.message)}</div>`;return}
+  }catch(e){c.innerHTML=`<div class="state err">❌ Не вдалося виконати серверну перевірку: ${esc(e.message||'Невідома помилка')}</div>`;return}
   // Browser-side checks verify the deployed site's real response headers and cookie behavior.
   try{
     const r=await fetch(location.href,{cache:'no-store',credentials:'same-origin'});
