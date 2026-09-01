@@ -73,6 +73,7 @@ async function validateSession(s, token, event = null) {
   if (revoked) return null;
   if (sess.expiresAt < Date.now()) { await deleteSession(s, token); return null; }
 
+  let ipChangedThisRequest = false;
   if (event && sess.bindingVersion >= 1 && sess.deviceId) {
     const { getClientIp, getUserAgent } = require('./security');
     const ip = getClientIp(event);
@@ -89,6 +90,7 @@ async function validateSession(s, token, event = null) {
       const previousIp = sess.ipLastSeen;
       sess.ipChanges = Number(sess.ipChanges || 0) + 1;
       sess.ipLastSeen = ip;
+      ipChangedThisRequest = true;
       await recordActivity(s, sess.userId, 'session-ip-change', { ip, previousIp, device: sess.device, sessionId: sess.sessionId, changeCount: sess.ipChanges }).catch(() => {});
     }
   }
@@ -117,9 +119,8 @@ async function validateSession(s, token, event = null) {
     const migrated = list.map(k => k === read.oldKey ? read.key : k);
     await s.setJSON(listKey, [...new Set(migrated)].slice(-SESSION_LIST_LIMIT)).catch(() => {});
   }
-  if (!sess.lastActive || Date.now() - sess.lastActive > 5 * 60 * 1000 || (sess.ipLastSeen !== sess.ip && sess.ip !== 'unknown')) {
+  if (!sess.lastActive || Date.now() - sess.lastActive > 5 * 60 * 1000 || ipChangedThisRequest) {
     sess.lastActive = Date.now();
-    if (sess.ipLastSeen !== sess.ip && sess.ip && sess.ip !== 'unknown') sess.ipLastSeen = sess.ip;
     await s.setJSON(read.key, sess).catch(() => {});
     user.lastActive = sess.lastActive; await s.setJSON(`user:${sess.username}`, user).catch(() => {});
   }
@@ -173,7 +174,7 @@ async function revokeSessionById(s, userId, sessionId, exceptToken = '') {
   for (const key of list) {
     if (key === exceptKey) continue;
     const sess = await s.get(key, { type: 'json' }).catch(() => null); if (!sess) continue;
-    if (String(sess.sessionId) === String(sessionId)) { const token = key.replace(/^session:/,''); /* key is hash, not token */
+    if (String(sess.sessionId) === String(sessionId)) {
       await s.delete(key).catch(() => {});
       await recordActivity(s, userId, 'session-revoked-by-user', { targetSessionId: String(sessionId).slice(0,32), reason:'user-request' }).catch(()=>{});
       const next=list.filter(x=>x!==key); if(next.length) await s.setJSON(`user-sessions:${userId}`,next); else await s.delete(`user-sessions:${userId}`);
