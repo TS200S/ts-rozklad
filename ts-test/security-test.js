@@ -39,10 +39,10 @@ for (const rel of ['index.html','admin.html','admin-recovery.html','secret.html'
 }
 
 const pkg = JSON.parse(read('package.json'));
-check('version', pkg.version === '5.3.8', pkg.version);
+check('version', pkg.version === '5.3.10', pkg.version);
 check('dependencies-pinned', Object.values(pkg.dependencies || {}).every(v => /^\d+\.\d+\.\d+$/.test(v)));
 check('nodemailer-supported-major', /^9\./.test(String(pkg.dependencies?.nodemailer || '')));
-check('blobs-pinned-current-8x', pkg.dependencies?.['@netlify/blobs'] === '8.1.2');
+check('blobs-conditional-writes-supported', pkg.dependencies?.['@netlify/blobs'] === '10.7.13');
 check('npm-security-test-script', pkg.scripts?.['security:test'] === 'node ts-test/security-test.js');
 
 const netlify = read('netlify.toml');
@@ -63,9 +63,11 @@ check('session-cookie-samesite', session.includes('SameSite=Lax'));
 check('no-bearer-auth', ![read('index.html'), ...jsFiles.map(f=>fs.readFileSync(f,'utf8'))].join('\n').includes('Authorization: Bearer'));
 
 const upload = read('netlify/functions/note-files-upload.js');
-check('no-octet-stream-upload', !upload.includes("'application/octet-stream'"));
+check('no-generic-octet-client-upload', !read('index.html').includes("accept=\"application/octet-stream\""));
 check('attachment-limit', upload.includes('attachmentCount >= 20') && upload.includes('NOTE_FILE_LIMIT'));
-check('file-size-limit', upload.includes('4 * 1024 * 1024'));
+check('file-size-limit', upload.includes('25 * 1024 * 1024') && upload.includes('CHUNK_SIZE = 3 * 1024 * 1024'));
+check('chunked-upload-flow', upload.includes("action === 'init'") && upload.includes("action === 'chunk'") && upload.includes("action === 'finalize'"));
+check('chunk-cleanup', read('netlify/functions/cleanup-bans.js').includes('file-upload-chunk:') && read('netlify/functions/cleanup-bans.js').includes('2 * 60 * 60 * 1000'));
 check('file-magic-validation', upload.includes('hasMagic(bytes, mime)'));
 check('file-private-storage', upload.includes('const blobKey = `file:${sess.userId}:${id}`'));
 check('file-delete-origin', read('netlify/functions/note-files-delete.js').includes('isSameOriginRequest(event)'));
@@ -103,6 +105,8 @@ check('orphan-cleanup-present', cleanup.includes("prefix: 'file-meta:'") && clea
 check('orphan-cleanup-integrated', cleanup.includes('orphanedFiles') && cleanup.includes('orphanGraceMs'));
 check('orphan-grace-period', cleanup.includes('60 * 60 * 1000'));
 check('sw-cache-matches-release', read('sw.js').includes(`ts-daily-v${pkg.version}-stable`));
+check('self-diagnostics-function', fs.existsSync(path.join(fnDir,'system-diagnostics.js')));
+check('diagnostics-conditional-write-probe', read('netlify/functions/system-diagnostics.js').includes('CONDITIONAL_WRITE_REJECTED') && read('netlify/functions/system-diagnostics.js').includes('onlyIfMatch'));
 check('sw-does-not-cache-api', read('sw.js').includes("url.pathname.startsWith('/.netlify/functions/')"));
 check('cron-no-query-secret', !checkCron.includes('queryStringParameters') && !checkCron.includes('?secret='));
 check('cron-timing-safe-secret', checkCron.includes('crypto.timingSafeEqual'));
