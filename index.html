@@ -271,7 +271,7 @@ button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.t
 .lright{display:flex;flex-direction:column;align-items:flex-end;gap:4px;flex-shrink:0;}
 .lstatus{font-size:9px;font-weight:800;letter-spacing:1px;text-transform:uppercase;}
 .llinks{display:flex;gap:6px;}
-.lic{font-size:14px;text-decoration:none;opacity:.4;transition:opacity .2s;}.lic:hover{opacity:1;}
+.lic{font-size:14px;text-decoration:none;opacity:.85;color:var(--accent);transition:opacity .2s;}.lic:hover{opacity:1;}
 
 /* ===== DAY HEADER ===== */
 .dhdr{display:flex;align-items:center;gap:8px;margin:14px 0 8px;}
@@ -1362,7 +1362,7 @@ function openEditNote(id){
   document.getElementById('notes-btn-del').classList.remove('hidden');
   document.getElementById('nf-text').value=n.text;
   document.getElementById('nf-deadline').value=n.deadline||'';
-  document.getElementById('nf-files').value=''; document.getElementById('nf-attachments').innerHTML=(n.attachments||[]).map(a=>`<div>📎 ${esc(a.name)} <button onclick="event.preventDefault();deleteNoteFile('${n.id}','${a.id}')" style="border:0;background:none;color:var(--danger);cursor:pointer">видалити</button></div>`).join('');
+  document.getElementById('nf-files').value=''; document.getElementById('nf-attachments').innerHTML=(n.attachments||[]).map(a=>`<div>📎 <span onclick="openNoteFile('${n.id}','${a.id}')" style="cursor:pointer;text-decoration:underline;color:var(--text2)">${esc(a.name)}</span> <button onclick="event.preventDefault();deleteNoteFile('${n.id}','${a.id}')" style="border:0;background:none;color:var(--danger);cursor:pointer">видалити</button></div>`).join('');
   document.getElementById('notes-modal-overlay').classList.remove('hidden');
 }
 function closeNotesModal(){document.getElementById('notes-modal-overlay').classList.add('hidden');}
@@ -1720,7 +1720,8 @@ function startSessionWatcher(){
   if(sessionWatchStarted)return;
   sessionWatchStarted=true;
   setTimeout(checkSessionStatus,250);
-  setInterval(checkSessionStatus,10000);
+  setInterval(()=>{if(document.visibilityState==='visible')checkSessionStatus();},60000);
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')checkSessionStatus();});
 }
 function onAuthSuccess(data){
   localStorage.setItem('ts_userid',data.userId);
@@ -2197,7 +2198,7 @@ async function subscribeToPush(){
 let syncTimer=null;
 let pendingSyncAfterPull=false;
 let syncInFlight=null;
-function queueServerSync(immediate=false){
+function queueServerSync(immediate=false,retriesLeft=3){
   if(applyingRemote){pendingSyncAfterPull=true;return Promise.resolve();}
   if(localStorage.getItem('ts_authed')!=='1')return Promise.resolve();
   if(syncTimer)clearTimeout(syncTimer);
@@ -2206,7 +2207,19 @@ function queueServerSync(immediate=false){
       method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},
       body:JSON.stringify({schedule,subjects,cfg,notes,oneOffLessons,baseUpdatedAt:lastSyncedTs})
     }).then(async res=>{
-      if(res.status===409){ await pullFromServer(); return; }
+      if(res.status===409){
+        // Another device saved first. Don't throw away whatever's still
+        // sitting unsaved here - adopt the server's newer timestamp as our
+        // baseline and retry sending our current (already-edited) data on
+        // top of it, instead of overwriting local edits wholesale.
+        const d=await res.json().catch(()=>({}));
+        if(d.updatedAt)lastSyncedTs=Number(d.updatedAt);
+        if(retriesLeft>0)return queueServerSync(true,retriesLeft-1);
+        // Repeated conflicts (unusual) - fall back to the server's version
+        // so we're not stuck retrying forever.
+        await pullFromServer();
+        return;
+      }
       if(!res.ok) throw new Error('sync '+res.status);
       const out=await res.json().catch(()=>({}));
       lastSyncedTs=Number(out.updatedAt||Date.now());
@@ -2237,7 +2250,8 @@ async function pullFromServer(){
     notes=data.notes||notes;
     oneOffLessons=Array.isArray(data.oneOffLessons)?data.oneOffLessons:oneOffLessons;
     localStorage.setItem('ts_oneoff',JSON.stringify(oneOffLessons));
-    cfg={...cfg,notif10:data.notif10!==false,notif5:data.notif5!==false};
+    cfg={...cfg,...(data.theme?{theme:data.theme,font:data.font,time24:data.time24,megaLink:data.megaLink,glass:data.glass,animBg:data.animBg,gradText:data.gradText,clockStyle:data.clockStyle,clockSecs:data.clockSecs,tabAnim:data.tabAnim,bgPreset:data.bgPreset,splashAnim:data.splashAnim,periods:data.periods||cfg.periods}:{}),notif10:data.notif10!==false,notif5:data.notif5!==false};
+    applyTheme();
     localStorage.setItem('ts_sch',JSON.stringify(schedule));
     localStorage.setItem('ts_subjs',JSON.stringify(subjects));
     localStorage.setItem('ts_notes',JSON.stringify(notes));
@@ -2292,6 +2306,9 @@ if(navigator.serviceWorker){
   navigator.serviceWorker.addEventListener('message', e=>{
     if(e.data&&e.data.type==='NOTIF_FIRED'){
       addNotif(e.data.title, e.data.body, 'lesson');
+    }
+    if(e.data&&e.data.type==='BAN_CHECK'){
+      checkSessionStatus();
     }
   });
 }
@@ -2408,7 +2425,7 @@ window.addEventListener('load',()=>setTimeout(()=>{
     syncNotifLogFromSW();
   }
 },3500));
-setInterval(()=>{if(localStorage.getItem('ts_authed')==='1'&&document.visibilityState==='visible')pullFromServer();},20000);
+setInterval(()=>{if(localStorage.getItem('ts_authed')==='1'&&document.visibilityState==='visible')pullFromServer();},60000);
 document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible'&&localStorage.getItem('ts_authed')==='1')pullFromServer();});
 </script>
 </body>

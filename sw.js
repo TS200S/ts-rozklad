@@ -162,6 +162,26 @@ function fire(title, body, tag, vibrate) {
 self.addEventListener('push', e => {
   let data = { title: '📚 Нагадування', body: 'Скоро пара' };
   try { if (e.data) data = e.data.json(); } catch (_) {}
+
+  if (data.ackKey) {
+    // Confirm receipt to the server immediately, whatever kind of push this
+    // is - check-notifications.js and ban-push.js use this to know whether
+    // to resend on the next run instead of assuming delivery happened.
+    e.waitUntil(fetch('/.netlify/functions/push-ack', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ ackKey: data.ackKey })
+    }).catch(() => {}));
+  }
+
+  if (data.type === 'ban-check') {
+    // Silent nudge: wake any open tabs to re-check their session right now
+    // instead of waiting for the next slow poll.
+    e.waitUntil(self.clients.matchAll({ includeUncontrolled: true }).then(clients => clients.forEach(c => c.postMessage({ type: 'BAN_CHECK' }))));
+    e.waitUntil(self.registration.showNotification(data.title, { body: data.body, icon: '/icon-192.png', badge: '/icon-192.png', tag: 'ban-check', silent: true, data: { url: '/' } }));
+    return;
+  }
+
   const tag = data.title + '_' + (data.body || '').slice(0, 20);
   e.waitUntil(self.registration.showNotification(data.title, { body: data.body, icon: '/icon-192.png', badge: '/icon-192.png', tag, vibrate: [150, 60, 150], renotify: true, data: { url: '/' } }));
   e.waitUntil(self.clients.matchAll({ includeUncontrolled: true }).then(clients => clients.forEach(c => c.postMessage({ type: 'NOTIF_FIRED', title: data.title, body: data.body }))));

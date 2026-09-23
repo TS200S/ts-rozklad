@@ -9,7 +9,7 @@
     Service-Worker-Allowed = "/"
 
 [functions."cleanup-bans"]
-  schedule = "* * * * *"
+  schedule = "*/15 * * * *"
 
 
 

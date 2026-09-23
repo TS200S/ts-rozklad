@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Тестовий вхід</title>
+<style>
+  body{background:#0a0e17;color:#e8eaf2;font-family:sans-serif;display:flex;align-items:center;justify-content:center;height:100vh;margin:0;padding:20px;box-sizing:border-box}
+  .card{max-width:400px;text-align:center}
+  button{background:#2563eb;color:#fff;border:0;border-radius:12px;padding:16px 28px;font-size:16px;font-weight:700;cursor:pointer;margin-top:16px}
+  p{color:#9aa3b8;font-size:14px;line-height:1.5}
+</style>
+</head>
+<body>
+<div class="card">
+  <h2>🧪 Тестовий вхід (без сервера)</h2>
+  <p>Натисни кнопку — вона сама виставить локальні дані "як залогинений" і одразу відкриє index.html. Реальний сервер при цьому не викликається.</p>
+  <button onclick="go()">Увійти й відкрити застосунок</button>
+</div>
+<script>
+function go(){
+  localStorage.setItem('ts_authed','1');
+  localStorage.setItem('ts_userid','test-user');
+  localStorage.setItem('ts_username','TestUser');
+  location.href='index.html';
+}
+</script>
+</body>
+</html>
