@@ -1,11 +1,20 @@
 const { store } = require('./lib/store');
 
+// Runs every 15 minutes (see netlify.toml). None of the work here is
+// time-critical:
+// - Ban expiry: validateSession() already lifts an expired ban live, the
+//   instant the user's session is next checked. This just tidies the
+//   stored user record and revoked-ban markers so admin views don't show
+//   a stale "banned" flag in the meantime.
+// - File/upload cleanup: reconciles state left by interrupted transactions,
+//   nothing here needs faster-than-15-minute reaction time.
 exports.handler = async () => {
   try {
     const s = store();
     const now = Date.now();
-    const { blobs } = await s.list({ prefix: 'user:' });
     let unbanned = 0, orphanedFiles = 0;
+
+    const { blobs } = await s.list({ prefix: 'user:' });
     for (const b of blobs) {
       const u = await s.get(b.key, { type:'json' }).catch(()=>null);
       if (!u || !u.banned) continue;
@@ -22,8 +31,6 @@ exports.handler = async () => {
     }
 
     // Reconcile file metadata left by interrupted note/file transactions.
-    // Run this heavier scan every 15 minutes, not on every scheduler tick.
-    if (new Date().getUTCMinutes() % 15 === 0) {
     const { blobs: fileMetaBlobs } = await s.list({ prefix: 'file-meta:' });
     for (const b of fileMetaBlobs) {
       const userId = b.key.slice('file-meta:'.length);
@@ -57,23 +64,21 @@ exports.handler = async () => {
         console.error('[cleanup-bans:file-reconcile]', userId, fileErr?.message || fileErr);
       }
     }
-    }
 
     // Remove abandoned multipart uploads and their chunks. This keeps failed or
     // cancelled uploads from consuming Blobs storage indefinitely. We only touch
     // upload state older than the same 2-hour TTL used by note-files-upload.
-    if (new Date().getUTCMinutes() % 15 === 0) {
-      const { blobs: uploadStates } = await s.list({ prefix: 'file-upload:' }).catch(() => ({ blobs: [] }));
-      const cutoff = Date.now() - (2 * 60 * 60 * 1000);
-      for (const b of uploadStates) {
-        const state = await s.get(b.key, { type: 'json' }).catch(() => null);
-        if (!state || Number(state.updatedAt || state.createdAt || 0) >= cutoff) continue;
-        const prefix = `file-upload-chunk:${state.userId}:${state.uploadId}:`;
-        const { blobs: chunks } = await s.list({ prefix }).catch(() => ({ blobs: [] }));
-        for (const chunk of chunks) await s.delete(chunk.key).catch(() => {});
-        await s.delete(b.key).catch(() => {});
-      }
+    const { blobs: uploadStates } = await s.list({ prefix: 'file-upload:' }).catch(() => ({ blobs: [] }));
+    const cutoff = Date.now() - (2 * 60 * 60 * 1000);
+    for (const b of uploadStates) {
+      const state = await s.get(b.key, { type: 'json' }).catch(() => null);
+      if (!state || Number(state.updatedAt || state.createdAt || 0) >= cutoff) continue;
+      const prefix = `file-upload-chunk:${state.userId}:${state.uploadId}:`;
+      const { blobs: chunks } = await s.list({ prefix }).catch(() => ({ blobs: [] }));
+      for (const chunk of chunks) await s.delete(chunk.key).catch(() => {});
+      await s.delete(b.key).catch(() => {});
     }
+
     return {statusCode:200,headers:{'Cache-Control':'no-store'},body:JSON.stringify({ok:true,unbanned,orphanedFiles})};
   } catch(err) {
     return {statusCode:500,body:JSON.stringify({error:'Внутрішня помилка сервера'})};

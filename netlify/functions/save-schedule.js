@@ -5,6 +5,35 @@ function safeUrl(v){try{const u=new URL(String(v||''));return ['http:','https:']
 function cleanText(v,n=2000){return String(v??'').slice(0,n);}
 function cleanNotes(notes){return (Array.isArray(notes)?notes:[]).slice(0,500).filter(n=>n&&typeof n==='object'&&!Array.isArray(n)).map(n=>({id:cleanText(n.id,120),text:cleanText(n.text,4000),deadline:/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(String(n.deadline||''))?String(n.deadline):'',done:n.done===true,createdAt:Number(n.createdAt)||Date.now(),link:safeUrl(n.link),attachments:(Array.isArray(n.attachments)?n.attachments:[]).slice(0,20).filter(a=>a&&typeof a==='object'&&!Array.isArray(a)).map(a=>({id:cleanText(a.id,80),name:cleanText(a.name,120),mime:cleanText(a.mime,120),size:Math.max(0,Number(a.size)||0)}))}));}
 
+const THEMES=['blue','green','purple','cyan','orange','pink','red','yellow','lime','white'];
+const FONTS=['exo','syne','inter','mono','system','orb'];
+const BG_PRESETS=['aurora','sunset','ocean','galaxy','forest','fire','candy','neon'];
+const TAB_ANIMS=['none','fade','slide','zoom'];
+const SPLASH_ANIMS=['classic','spin','slide','pulse','blur','neon','glitch'];
+const CLOCK_STYLES=['minimal','big','split','neon','analog'];
+function safeCfg(cfg){
+  const c=cfg||{};
+  const periods=(Array.isArray(c.periods)?c.periods:[]).slice(0,20).filter(p=>p&&typeof p==='object').map(p=>({n:Number(p.n)||0,start:/^\d{2}:\d{2}$/.test(String(p.start||''))?p.start:'09:00',end:/^\d{2}:\d{2}$/.test(String(p.end||''))?p.end:'10:00'}));
+  return {
+    name:cleanText(c.name,60),
+    theme:THEMES.includes(c.theme)?c.theme:'blue',
+    font:FONTS.includes(c.font)?c.font:'exo',
+    time24:c.time24!==false,
+    megaLink:safeUrl(c.megaLink),
+    notif10:c.notif10!==false,
+    notif5:c.notif5!==false,
+    glass:c.glass===true,
+    animBg:c.animBg===true,
+    gradText:c.gradText===true,
+    clockStyle:CLOCK_STYLES.includes(c.clockStyle)?c.clockStyle:'minimal',
+    clockSecs:c.clockSecs===true,
+    tabAnim:TAB_ANIMS.includes(c.tabAnim)?c.tabAnim:'slide',
+    bgPreset:BG_PRESETS.includes(c.bgPreset)?c.bgPreset:'aurora',
+    splashAnim:SPLASH_ANIMS.includes(c.splashAnim)?c.splashAnim:'neon',
+    periods:periods.length?periods:undefined
+  };
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') return { statusCode:405, body:'Method Not Allowed' };
   if (!isSameOriginRequest(event)) return { statusCode: 403, body: JSON.stringify({ error: 'Недозволене походження запиту' }) };
@@ -20,12 +49,12 @@ exports.handler = async (event) => {
     if(current && baseUpdatedAt && Number(current.updatedAt||0)>baseUpdatedAt) return{statusCode:409,headers:{'Content-Type':'application/json','Cache-Control':'no-store'},body:JSON.stringify({error:'Розклад було змінено на іншому пристрої. Онови дані та спробуй ще раз.',conflict:true,updatedAt:Number(current.updatedAt||0)})};
 
     const newNotes=cleanNotes(notes);
-    const safeSubjects=subjects.slice(0,500).filter(x=>x&&typeof x==='object'&&!Array.isArray(x)).map(x=>({id:cleanText(x.id,120),name:cleanText(x.name,300),teacher:cleanText(x.teacher,300),room:cleanText(x.room,100),link:safeUrl(x.link)}));
+    const safeSubjects=subjects.slice(0,500).filter(x=>x&&typeof x==='object'&&!Array.isArray(x)).map(x=>({id:cleanText(x.id,120),name:cleanText(x.name,300),teacher:cleanText(x.teacher,300),room:cleanText(x.room,100),link:safeUrl(x.link),gclass:safeUrl(x.gclass),color:/^#[0-9a-fA-F]{3,8}$/.test(String(x.color||''))?String(x.color):''}));
     const safeOneOff=(Array.isArray(oneOffLessons)?oneOffLessons:[]).slice(0,500).filter(x=>x&&typeof x==='object'&&!Array.isArray(x)).map(x=>({...x,date:/^\d{4}-\d{2}-\d{2}$/.test(String(x.date||''))?String(x.date):'',time:/^\d{2}:\d{2}$/.test(String(x.time||''))?String(x.time):'',duration:Math.min(1440,Math.max(15,Number(x.duration)||45))}));
     const saved=await atomicUpdateJSON(`schedule-data:${sess.userId}`, current || {schedule:[],subjects:[],notes:[],oneOffLessons:[]}, existing=>{
       const nowCurrent=existing||{};
       if(baseUpdatedAt && Number(nowCurrent.updatedAt||0)>baseUpdatedAt){const err=new Error('SCHEDULE_CONFLICT');err.code='SCHEDULE_CONFLICT';throw err;}
-      return {schedule,subjects:safeSubjects,notes:newNotes,oneOffLessons:safeOneOff,notif10:cfg?.notif10!==false,notif5:cfg?.notif5!==false,updatedAt:Date.now()};
+      return {schedule,subjects:safeSubjects,notes:newNotes,oneOffLessons:safeOneOff,...safeCfg(cfg),updatedAt:Date.now()};
     });
 
     // Whole-note deletions are reconciled by the admin orphan cleanup. We do not

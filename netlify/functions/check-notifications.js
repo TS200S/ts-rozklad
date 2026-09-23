@@ -41,9 +41,23 @@ function kyivParts() {
 
 // Runs the full reminder check for a single user's data. Nothing here is
 // ever shared across users - every key it touches is namespaced by userId.
-async function claimPush(s, key) {
-  const result = await s.set(key, JSON.stringify({ claimedAt: Date.now() }), { onlyIfNew: true });
-  return !!result.modified;
+//
+// Unlike a plain "claim once" lock, this also tracks whether the push we
+// sent was actually confirmed delivered (see push-ack.js / sw.js). If the
+// previous attempt was never acked after RETRY_GRACE_MS, the next cron
+// tick (this runs every minute) resends it instead of assuming it landed.
+const RETRY_GRACE_MS = 90 * 1000;
+async function claimOrRetryPush(s, key) {
+  const existing = await s.get(key, { type: 'json' }).catch(() => null);
+  const now = Date.now();
+  if (!existing) {
+    const result = await s.set(key, JSON.stringify({ acked: false, sentAt: now, attempts: 1 }), { onlyIfNew: true });
+    return !!result.modified;
+  }
+  if (existing.acked) return false; // already confirmed delivered - don't resend
+  if (now - Number(existing.sentAt || 0) < RETRY_GRACE_MS) return false; // still waiting on an ack, don't spam
+  await s.setJSON(key, { acked: false, sentAt: now, attempts: (Number(existing.attempts) || 1) + 1 }).catch(() => {});
+  return true;
 }
 
 function pushClaimKey(userId, dateKey, reminderKey, endpoint) {
@@ -52,10 +66,19 @@ function pushClaimKey(userId, dateKey, reminderKey, endpoint) {
 }
 
 async function processUser(s, userId, dayIdx, curMins, dateKey) {
-  const data = await s.get(`schedule-data:${userId}`, { type: 'json', consistency: 'strong' });
-  const allSubscriptions = (await s.get(`subscriptions:${userId}`, { type: 'json', consistency: 'strong' })) || [];
+  // Check subscriptions first - it's the cheap, small read. Most of the
+  // cost here is the schedule-data blob (notes/attachments/etc can be
+  // sizeable), so skip it entirely for users with no active push endpoint
+  // instead of fetching everything and then discovering there's nothing
+  // to do. Eventual consistency is fine for both - reminder windows are
+  // several minutes wide already, so a few seconds of staleness never
+  // matters here (unlike a strong-consistency read on every save).
+  const allSubscriptions = (await s.get(`subscriptions:${userId}`, { type: 'json' })) || [];
   const subscriptions = allSubscriptions.filter(sub => sub && sub.siteOrigin === CURRENT_ORIGIN);
-  if (!data || !subscriptions.length) return { sent: 0 };
+  if (!subscriptions.length) return { sent: 0 };
+
+  const data = await s.get(`schedule-data:${userId}`, { type: 'json' });
+  if (!data) return { sent: 0 };
 
   let slots = data.schedule?.[dayIdx] || data.schedule?.[String(dayIdx)] || [];
   const oneOff = Array.isArray(data.oneOffLessons) ? data.oneOffLessons.filter(x => x && x.date === dateKey) : [];
@@ -85,6 +108,15 @@ async function processUser(s, userId, dayIdx, curMins, dateKey) {
         body: `За 5 хвилин · Готуйся!${subj.teacher ? ' · ' + subj.teacher : ''}`
       });
     }
+    // A reminder right at start time - the 10/5-minute warnings are easy to
+    // forget about by the time the lesson actually begins.
+    if (data.notif5 && diff <= 0 && diff >= -2) {
+      reminders.push({
+        key: `lesson:${lessonIdentity}:${sl.time}:0`,
+        title: '🔔 ' + subj.name,
+        body: `Пара почалася!${subj.teacher ? ' · ' + subj.teacher : ''}`
+      });
+    }
   }
 
   if (Array.isArray(data.notes)) {
@@ -112,10 +144,10 @@ async function processUser(s, userId, dayIdx, curMins, dateKey) {
     let keep = true;
     for (const msg of reminders) {
       const claimKey = pushClaimKey(userId, dateKey, msg.key, sub.endpoint);
-      const claimed = await claimPush(s, claimKey);
+      const claimed = await claimOrRetryPush(s, claimKey);
       if (!claimed) continue;
       try {
-        await webpush.sendNotification(sub, JSON.stringify({ title: msg.title, body: msg.body }));
+        await webpush.sendNotification(sub, JSON.stringify({ title: msg.title, body: msg.body, ackKey: claimKey }));
         sent++;
         await atomicUpdateJSON(`fired-log:${userId}`, { dateKey, fired: [] }, current => {
           const next = current.dateKey === dateKey ? current : { dateKey, fired: [] };

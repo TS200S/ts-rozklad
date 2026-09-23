@@ -535,6 +535,13 @@ exports.handler = async (event) => {
       }
       await recordActivity(s, user.userId, isBan ? 'account-banned' : 'account-unbanned', { admin: admin.user.username, reason: user.banReason || '', expiresAt: user.banExpiresAt || 0, blockIp: !!body.blockIp, ips: sessionIps });
       await auditAdmin(s, admin, isBan ? 'ban-user' : 'unban-user', { username, blockIp: !!body.blockIp, reason: user.banReason || '', expiresAt: user.banExpiresAt || 0 });
+      if (isBan) {
+        // Best-effort: nudge any open tabs to re-check their session right
+        // now instead of waiting for the next slow poll. If this fails or
+        // never gets delivered, the regular session poll still catches the
+        // ban within its normal interval - this is purely a speed-up.
+        require('./lib/ban-push').sendBanPush(s, user.userId).catch(() => {});
+      }
       return json(200, { ok: true });
     }
 
