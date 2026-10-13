@@ -3,6 +3,35 @@ const { validateSession, extractToken } = require('./lib/session');
 const { enforceIpBan, isSameOriginRequest } = require('./lib/security');
 function safeUrl(v){try{const u=new URL(String(v||''));return ['http:','https:'].includes(u.protocol)?u.toString().slice(0,1000):'';}catch{return '';}}
 function cleanText(v,n=2000){return String(v??'').slice(0,n);}
+function safeHealthJournal(v){
+  const r=v&&typeof v==='object'&&!Array.isArray(v)?v:{};
+  const out={};
+  for(const k of Object.keys(r).slice(0,400)){
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(k))continue;
+    const e=r[k];if(!e||typeof e!=='object'||Array.isArray(e))continue;
+    const sleep=Number(e.sleep);
+    const mood=Number(e.mood);
+    out[k]={
+      sleep:Number.isFinite(sleep)&&sleep>=0&&sleep<=24?sleep:null,
+      mood:Number.isInteger(mood)&&mood>=1&&mood<=5?mood:null,
+      note:cleanText(e.note,300)
+    };
+  }
+  return out;
+}
+function safeSatRotation(v){
+  const r=v&&typeof v==='object'&&!Array.isArray(v)?v:{};
+  const anchorDate=/^\d{4}-\d{2}-\d{2}$/.test(String(r.anchorDate||''))?String(r.anchorDate):'';
+  const anchorDayIdx=Number.isInteger(r.anchorDayIdx)&&r.anchorDayIdx>=0&&r.anchorDayIdx<=4?r.anchorDayIdx:0;
+  const rawOverrides=r.overrides&&typeof r.overrides==='object'&&!Array.isArray(r.overrides)?r.overrides:{};
+  const overrides={};
+  for(const k of Object.keys(rawOverrides).slice(0,200)){
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(k))continue;
+    const val=Number(rawOverrides[k]);
+    if(Number.isInteger(val)&&val>=0&&val<=4)overrides[k]=val;
+  }
+  return{enabled:r.enabled===true,anchorDate,anchorDayIdx,overrides};
+}
 function cleanNotes(notes){return (Array.isArray(notes)?notes:[]).slice(0,500).filter(n=>n&&typeof n==='object'&&!Array.isArray(n)).map(n=>({id:cleanText(n.id,120),text:cleanText(n.text,4000),deadline:/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(String(n.deadline||''))?String(n.deadline):'',done:n.done===true,createdAt:Number(n.createdAt)||Date.now(),link:safeUrl(n.link),attachments:(Array.isArray(n.attachments)?n.attachments:[]).slice(0,20).filter(a=>a&&typeof a==='object'&&!Array.isArray(a)).map(a=>({id:cleanText(a.id,80),name:cleanText(a.name,120),mime:cleanText(a.mime,120),size:Math.max(0,Number(a.size)||0)}))}));}
 
 const THEMES=['blue','green','purple','cyan','orange','pink','red','yellow','lime','white'];
@@ -23,6 +52,10 @@ function safeCfg(cfg){
     notif10:c.notif10!==false,
     notif5:c.notif5!==false,
     glass:c.glass===true,
+    holidayFx:c.holidayFx!==false,
+    waterReminder:c.waterReminder!==false,
+    breakReminder:c.breakReminder!==false,
+    dailySummary:c.dailySummary!==false,
     animBg:c.animBg===true,
     gradText:c.gradText===true,
     clockStyle:CLOCK_STYLES.includes(c.clockStyle)?c.clockStyle:'minimal',
@@ -42,7 +75,7 @@ exports.handler = async (event) => {
     const ipBan=await enforceIpBan(s,event); if(ipBan)return{statusCode:403,body:JSON.stringify({error:'Цей IP-адрес заблоковано'})};
     const sess=await validateSession(s,extractToken(event),event); if(!sess)return{statusCode:401,body:JSON.stringify({error:'Сесія недійсна, увійди ще раз'})}; if(sess.banned)return{statusCode:403,body:JSON.stringify({error:'Акаунт заблоковано'})};
     if(String(event.body||'').length>900000)return{statusCode:413,body:JSON.stringify({error:'Дані розкладу завеликі'})};
-    const body=JSON.parse(event.body||'{}'); const {schedule,subjects,cfg,notes,oneOffLessons}=body;
+    const body=JSON.parse(event.body||'{}'); const {schedule,subjects,cfg,notes,oneOffLessons,satRotation,healthJournal}=body;
     if(!schedule||!Array.isArray(subjects))return{statusCode:400,body:JSON.stringify({error:'Немає даних розкладу'})};
     const baseUpdatedAt=Number(body.baseUpdatedAt||0);
     const current=await s.get(`schedule-data:${sess.userId}`,{type:'json',consistency:'strong'}).catch(()=>null);
@@ -54,7 +87,7 @@ exports.handler = async (event) => {
     const saved=await atomicUpdateJSON(`schedule-data:${sess.userId}`, current || {schedule:[],subjects:[],notes:[],oneOffLessons:[]}, existing=>{
       const nowCurrent=existing||{};
       if(baseUpdatedAt && Number(nowCurrent.updatedAt||0)>baseUpdatedAt){const err=new Error('SCHEDULE_CONFLICT');err.code='SCHEDULE_CONFLICT';throw err;}
-      return {schedule,subjects:safeSubjects,notes:newNotes,oneOffLessons:safeOneOff,...safeCfg(cfg),updatedAt:Date.now()};
+      return {schedule,subjects:safeSubjects,notes:newNotes,oneOffLessons:safeOneOff,satRotation:safeSatRotation(satRotation),healthJournal:safeHealthJournal(healthJournal),...safeCfg(cfg),updatedAt:Date.now()};
     });
 
     // Whole-note deletions are reconciled by the admin orphan cleanup. We do not

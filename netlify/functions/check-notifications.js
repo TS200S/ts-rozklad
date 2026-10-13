@@ -60,6 +60,22 @@ async function claimOrRetryPush(s, key) {
   return true;
 }
 
+// Mirrors the frontend's resolveSatIndex() in index.html - keep these two in
+// sync. Given a Saturday's date, resolves which weekday (0=Mon..4=Fri) its
+// make-up lessons actually belong to, honoring a per-date manual override
+// before falling back to the anchor-based rotation.
+function resolveSatIndex(satRotation, dateStr) {
+  if (!satRotation || satRotation.enabled !== true) return 5;
+  const ov = satRotation.overrides && satRotation.overrides[dateStr];
+  if (Number.isInteger(ov) && ov >= 0 && ov <= 4) return ov;
+  if (!satRotation.anchorDate) return 5;
+  const anchor = new Date(satRotation.anchorDate + 'T00:00:00');
+  const target = new Date(dateStr + 'T00:00:00');
+  if (isNaN(anchor.getTime()) || isNaN(target.getTime())) return 5;
+  const weeks = Math.round((target - anchor) / (7 * 24 * 60 * 60 * 1000));
+  return ((Number(satRotation.anchorDayIdx || 0) + weeks) % 5 + 5) % 5;
+}
+
 function pushClaimKey(userId, dateKey, reminderKey, endpoint) {
   const digest = crypto.createHash('sha256').update(String(endpoint)).digest('hex').slice(0, 24);
   return `push-claim:${userId}:${dateKey}:${crypto.createHash('sha256').update(String(reminderKey)).digest('hex').slice(0, 24)}:${digest}`;
@@ -80,7 +96,8 @@ async function processUser(s, userId, dayIdx, curMins, dateKey) {
   const data = await s.get(`schedule-data:${userId}`, { type: 'json' });
   if (!data) return { sent: 0 };
 
-  let slots = data.schedule?.[dayIdx] || data.schedule?.[String(dayIdx)] || [];
+  const effDayIdx = dayIdx === 5 ? resolveSatIndex(data.satRotation, dateKey) : dayIdx;
+  let slots = data.schedule?.[effDayIdx] || data.schedule?.[String(effDayIdx)] || [];
   const oneOff = Array.isArray(data.oneOffLessons) ? data.oneOffLessons.filter(x => x && x.date === dateKey) : [];
   slots = slots.concat(oneOff.map(x => ({ ...x, _oneOff: true })));
 
@@ -94,14 +111,14 @@ async function processUser(s, userId, dayIdx, curMins, dateKey) {
     const subj = (data.subjects || []).find(x => x.id === sl.subjId) || { name: 'Пара' };
     const lessonIdentity = String(sl.id || sl.lessonId || sl.subjId || `${sl.time}:${subj.name}`);
 
-    if (data.notif10 && diff <= 10 && diff >= 8) {
+    if (data.notif10 && diff <= 10 && diff >= 6) {
       reminders.push({
         key: `lesson:${lessonIdentity}:${sl.time}:10`,
         title: '⏰ ' + subj.name,
         body: `За 10 хвилин · Початок о ${sl.time}${subj.teacher ? ' · ' + subj.teacher : ''}`
       });
     }
-    if (data.notif5 && diff <= 5 && diff >= 3) {
+    if (data.notif5 && diff <= 5 && diff >= 1) {
       reminders.push({
         key: `lesson:${lessonIdentity}:${sl.time}:5`,
         title: '📚 ' + subj.name,
@@ -110,13 +127,37 @@ async function processUser(s, userId, dayIdx, curMins, dateKey) {
     }
     // A reminder right at start time - the 10/5-minute warnings are easy to
     // forget about by the time the lesson actually begins.
-    if (data.notif5 && diff <= 0 && diff >= -2) {
+    if (data.notif5 && diff <= 0 && diff >= -5) {
       reminders.push({
         key: `lesson:${lessonIdentity}:${sl.time}:0`,
         title: '🔔 ' + subj.name,
         body: `Пара почалася!${subj.teacher ? ' · ' + subj.teacher : ''}`
       });
     }
+  }
+
+  // Free, rule-based daily summary - reuses the same push pipeline as lesson
+  // and note reminders, so it costs nothing extra (no Groq call). Fires once
+  // per day in a short morning window, and only when there's something
+  // actually worth flagging (no noise on an uneventful day).
+  if (data.dailySummary !== false && curMins >= 450 && curMins <= 459) {
+    const openNotes = Array.isArray(data.notes) ? data.notes.filter(n => !n.done && n.deadline) : [];
+    const [sy, smo, sd] = dateKey.split('-').map(Number);
+    const nowWall = Date.UTC(sy, smo - 1, sd, 0, 0) + curMins * 60000;
+    const deadlineWall = (n) => {
+      const [dPart, tPart] = String(n.deadline).split('T');
+      const [dy, dmo, dd] = String(dPart || '').split('-').map(Number);
+      const [dh, dmi] = String(tPart || '23:59').split(':').map(Number);
+      if (![dy, dmo, dd, dh, dmi].every(Number.isFinite)) return null;
+      return Date.UTC(dy, dmo - 1, dd, dh, dmi);
+    };
+    const overdue = openNotes.filter(n => { const t = deadlineWall(n); return t !== null && t < nowWall; });
+    const dueToday = openNotes.filter(n => { const t = deadlineWall(n); return t !== null && t >= nowWall && t - nowWall <= 24 * 3600 * 1000; });
+    let summary = null;
+    if (overdue.length) summary = { title: '⚠️ Доброго ранку', body: `У тебе ${overdue.length} прострочен${overdue.length === 1 ? 'а нотатка' : 'і нотатки'}. Варто розібратись сьогодні.` };
+    else if (dueToday.length) summary = { title: '⏳ Доброго ранку', body: `${dueToday.length} ${dueToday.length === 1 ? 'дедлайн' : 'дедлайни'} сьогодні/завтра — не забудь.` };
+    else if (slots.length >= 5) summary = { title: '🔥 Доброго ранку', body: `Сьогодні ${slots.length} пар — насичений день, не забувай про перерви й воду.` };
+    if (summary) reminders.push({ key: `daily-summary:${dateKey}`, title: summary.title, body: summary.body });
   }
 
   if (Array.isArray(data.notes)) {
