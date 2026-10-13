@@ -14,6 +14,7 @@ Browser/PWA → Netlify Function → session/security middleware → domain logi
 - **Push:** browser Service Worker + VAPID subscription → `save-subscription`; notifications are triggered by `check-notifications`.
 - **Cron:** cron-job.org calls `check-notifications` with `X-Cron-Secret`. `cleanup-bans` is the only Netlify scheduled function.
 - **Admin:** `admin.html` → `admin` function → privileged operations; `security-alerts`, `storage-admin`, `email-guard-stats`, and `system-diagnostics` provide read/diagnostic views.
+- **AI chat:** `ai-chat` function proxies Groq (key never reaches the client), reads schedule/notes/health as context, can add/complete notes freely and delete/update notes only after client-side confirmation. See `AI-CHAT-SETUP.md`.
 - **Security:** HttpOnly/Secure/SameSite session cookie, device binding, Origin check, IP bans/rate limits, 2FA/step-up, audit log, security alerts.
 
 ## Storage keys

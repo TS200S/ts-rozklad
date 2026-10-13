@@ -467,6 +467,28 @@ button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.t
 .btn-g,.btn-b,.btn-y,.savebtn,.addbtn,.mbsave,.mbcancel,.refresh,.tab-btn{transition:transform .16s ease,filter .16s ease,box-shadow .16s ease;}
 .btn-g:hover,.btn-b:hover,.btn-y:hover,.savebtn:hover,.addbtn:hover,.mbsave:hover,.refresh:hover{transform:translateY(-1px);filter:brightness(1.06);}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation-duration:.001ms!important;animation-iteration-count:1!important;scroll-behavior:auto!important;transition:none!important}}
+
+/* AI avatar + chat */
+#ai-avatar-btn{position:fixed;right:16px;bottom:22px;width:54px;height:54px;border-radius:50%;border:1px solid var(--border2);cursor:pointer;z-index:250;background:var(--bg2);box-shadow:0 8px 24px rgba(0,0,0,.4);display:flex;align-items:center;justify-content:center;padding:0;transition:transform .18s ease}
+#ai-avatar-btn:active{transform:scale(.9)}
+#ai-glow{animation:aiGlowPulse 3s ease-in-out infinite;transform-origin:center}
+@keyframes aiGlowPulse{0%,100%{opacity:.16;transform:scale(1)}50%{opacity:.32;transform:scale(1.08)}}
+#ai-avatar-btn.ai-thinking{animation:aiWiggle .9s ease-in-out infinite}
+#ai-avatar-btn.ai-thinking #ai-glow{animation:aiGlowPulse .7s ease-in-out infinite}
+@keyframes aiWiggle{0%,100%{transform:rotate(0)}25%{transform:rotate(-4deg)}75%{transform:rotate(4deg)}}
+#ai-eye-l,#ai-eye-r{transform-box:fill-box;transform-origin:center}
+#ai-avatar-btn.ai-thinking #ai-eye-l,#ai-avatar-btn.ai-thinking #ai-eye-r{animation:aiBlink .7s ease-in-out infinite}
+@keyframes aiBlink{0%,45%,100%{transform:scaleY(1)}50%,55%{transform:scaleY(.15)}}
+#ai-mouth-open{opacity:0}
+#ai-avatar-btn.ai-talking #ai-mouth-closed{opacity:0}
+#ai-avatar-btn.ai-talking #ai-mouth-open{animation:aiTalkMouth .32s steps(1) infinite}
+@keyframes aiTalkMouth{0%,100%{opacity:1}50%{opacity:0}}
+#ai-chat-panel{display:none;position:fixed;right:0;bottom:0;top:0;width:360px;max-width:96vw;background:var(--bg2);border-left:1px solid var(--border);z-index:300;flex-direction:column;box-shadow:-8px 0 32px rgba(0,0,0,.5);animation:slideRight .25s ease}
+#ai-chat-overlay{display:none;position:fixed;inset:0;z-index:299}
+.ai-msg{max-width:84%;padding:9px 12px;border-radius:14px;font-size:13px;line-height:1.45;margin-bottom:9px;white-space:pre-wrap;word-break:break-word}
+.ai-msg.user{margin-left:auto;background:var(--accent);color:#fff;border-bottom-right-radius:4px}
+.ai-msg.bot{margin-right:auto;background:var(--bg3);color:var(--text);border-bottom-left-radius:4px}
+.ai-msg.confirm{margin-right:auto;background:rgba(239,68,68,.12);border:1px solid rgba(239,68,68,.3);color:var(--text)}
 </style>
 <style>
  .ban-modal{position:fixed;inset:0;width:100vw;height:100vh;z-index:999999;background:rgba(0,0,0,.82);backdrop-filter:blur(12px);display:none;align-items:center;justify-content:center;padding:20px;box-sizing:border-box}
@@ -521,6 +543,35 @@ button:active,.card:active,.aitem-wrap:active,.theme-btn:active,.vtbtn:active,.t
   <div id="notif-list" style="flex:1;overflow-y:auto;padding:12px"></div>
 </div>
 <div id="notif-overlay" style="display:none;position:fixed;inset:0;z-index:299" onclick="toggleNotifCenter()"></div>
+
+<!-- AI AVATAR LAUNCHER -->
+<button id="ai-avatar-btn" onclick="toggleAiChat()" title="AI-помічник" aria-label="Відкрити AI-чат">
+  <svg viewBox="0 0 64 64" width="36" height="36">
+    <circle id="ai-glow" cx="32" cy="32" r="29" fill="var(--accent)" opacity=".18"/>
+    <rect x="13" y="15" width="38" height="32" rx="13" fill="var(--bg3)" stroke="var(--accent)" stroke-width="2"/>
+    <circle cx="32" cy="8" r="3" fill="var(--accent)"/>
+    <line x1="32" y1="11" x2="32" y2="15" stroke="var(--accent)" stroke-width="2"/>
+    <circle id="ai-eye-l" cx="24" cy="30" r="3.4" fill="var(--accent)"/>
+    <circle id="ai-eye-r" cx="40" cy="30" r="3.4" fill="var(--accent)"/>
+    <path id="ai-mouth-closed" d="M24 39 Q32 42 40 39" stroke="var(--accent)" stroke-width="2.3" fill="none" stroke-linecap="round"/>
+    <ellipse id="ai-mouth-open" cx="32" cy="40" rx="6" ry="4.5" fill="var(--accent)"/>
+  </svg>
+</button>
+
+<!-- AI CHAT PANEL -->
+<div id="ai-chat-panel">
+  <div style="padding:16px 16px 12px;border-bottom:1px solid var(--border);display:flex;align-items:center;gap:10px">
+    <svg viewBox="0 0 64 64" width="30" height="30"><circle cx="32" cy="32" r="29" fill="var(--accent)" opacity=".15"/><rect x="13" y="15" width="38" height="32" rx="13" fill="var(--bg3)" stroke="var(--accent)" stroke-width="2"/><circle cx="24" cy="30" r="3.4" fill="var(--accent)"/><circle cx="40" cy="30" r="3.4" fill="var(--accent)"/><path d="M24 39 Q32 42 40 39" stroke="var(--accent)" stroke-width="2.3" fill="none" stroke-linecap="round"/></svg>
+    <div style="flex:1"><div style="font-size:14px;font-weight:900;color:var(--text)">AI-помічник</div><div id="ai-chat-status" style="font-size:10px;color:var(--text4)">онлайн</div></div>
+    <button onclick="toggleAiChat()" style="background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer;padding:0 4px">✕</button>
+  </div>
+  <div id="ai-chat-list" style="flex:1;overflow-y:auto;padding:14px"></div>
+  <div style="padding:10px 12px;border-top:1px solid var(--border);display:flex;gap:8px">
+    <input id="ai-chat-input" type="text" placeholder="Напиши повідомлення…" style="flex:1;background:var(--bg3);border:1px solid var(--border2);border-radius:12px;padding:10px 12px;color:var(--text);font-family:var(--font);font-size:13px" onkeydown="if(event.key==='Enter')sendAiChat()">
+    <button onclick="sendAiChat()" style="background:var(--accent);border:none;border-radius:12px;color:#fff;width:42px;font-size:16px;cursor:pointer">➤</button>
+  </div>
+</div>
+<div id="ai-chat-overlay" onclick="toggleAiChat()"></div>
 
 <div id="offline-bar">📵 Офлайн-режим · Розклад збережено</div>
 
@@ -779,7 +830,7 @@ const DEF_SUBJECTS=[
   {id:'s3',name:'Програмування',teacher:'',link:'',gclass:'',color:'#8b5cf6'},
 ];
 const DEF_SCH={0:[{subjId:'s1',time:'08:30',duration:80,type:'lecture'},{subjId:'s3',time:'10:00',duration:80,type:'practice'}],1:[{subjId:'s2',time:'10:00',duration:80,type:'lecture'}],2:[{subjId:'s1',time:'08:30',duration:80,type:'seminar'},{subjId:'s2',time:'10:00',duration:80,type:'lab'}],3:[{subjId:'s3',time:'13:30',duration:80,type:'lecture'}],4:[{subjId:'s1',time:'08:30',duration:80,type:'practice'}],5:[],6:[]};
-const DEF_CFG={name:'Студенте',theme:'blue',font:'exo',time24:true,megaLink:'',notif10:true,notif5:true,glass:false,animBg:false,gradText:false,clockStyle:'minimal',clockSecs:false,tabAnim:'slide',bgPreset:'aurora',splashAnim:'neon',periods:[{n:1,start:'09:00',end:'10:00'},{n:2,start:'10:10',end:'11:10'},{n:3,start:'11:20',end:'12:20'},{n:4,start:'12:30',end:'13:30'},{n:5,start:'13:40',end:'14:40'},{n:6,start:'14:50',end:'15:50'}]};
+const DEF_CFG={name:'Студенте',theme:'blue',font:'exo',time24:true,megaLink:'',notif10:true,notif5:true,glass:false,animBg:false,gradText:false,clockStyle:'minimal',clockSecs:false,tabAnim:'slide',bgPreset:'aurora',splashAnim:'neon',holidayFx:true,waterReminder:true,breakReminder:true,dailySummary:true,periods:[{n:1,start:'09:00',end:'10:00'},{n:2,start:'10:10',end:'11:10'},{n:3,start:'11:20',end:'12:20'},{n:4,start:'12:30',end:'13:30'},{n:5,start:'13:40',end:'14:40'},{n:6,start:'14:50',end:'15:50'}]};
 
 function load(k,def){try{const s=localStorage.getItem(k);return s?JSON.parse(s):JSON.parse(JSON.stringify(def));}catch{return JSON.parse(JSON.stringify(def));}}
 let schedule=load('ts_sch',DEF_SCH);
@@ -795,6 +846,85 @@ const saveSubjs=()=>{localStorage.setItem('ts_subjs',JSON.stringify(subjects));q
 const saveNotes=()=>{localStorage.setItem('ts_notes',JSON.stringify(notes));queueServerSync();};
 const saveOneOff=()=>{localStorage.setItem('ts_oneoff',JSON.stringify(oneOffLessons));queueServerSync();};
 const saveCfg=()=>{localStorage.setItem('ts_cfg',JSON.stringify(cfg));queueServerSync();};
+
+// ===== SATURDAY ROTATION (make-up days) =====
+// Some schedules use Saturdays as make-up days that rotate through the
+// working week (e.g. this Saturday = Thursday's lessons, next Saturday =
+// Friday's, etc). satRotation.overrides lets a specific Saturday be pinned
+// to a day manually when the automatic rotation doesn't match what's
+// actually announced.
+let satRotation=load('ts_satrot',{enabled:false,anchorDate:'',anchorDayIdx:0,overrides:{}});
+const saveSatRotation=()=>{localStorage.setItem('ts_satrot',JSON.stringify(satRotation));queueServerSync();};
+const SAT_ROT_DAYS=['Понеділок','Вівторок','Середа','Четвер','Пятниця'];
+function resolveSatIndex(dateStr){
+  if(!satRotation||!satRotation.enabled)return 5;
+  const ov=satRotation.overrides&&satRotation.overrides[dateStr];
+  if(Number.isInteger(ov)&&ov>=0&&ov<=4)return ov;
+  if(!satRotation.anchorDate)return 5;
+  const anchor=new Date(satRotation.anchorDate+'T00:00:00'),target=new Date(dateStr+'T00:00:00');
+  if(isNaN(anchor)||isNaN(target))return 5;
+  const weeks=Math.round((target-anchor)/(7*24*60*60*1000));
+  return ((Number(satRotation.anchorDayIdx||0)+weeks)%5+5)%5;
+}
+function effIdx(rawIdx,dateStr){return rawIdx===5?resolveSatIndex(dateStr):rawIdx;}
+// ===== HEALTH JOURNAL =====
+// Keyed by date (YYYY-MM-DD) -> {sleep:hours, mood:1-5, note}. Synced to the
+// server like notes so it's visible across devices.
+let healthJournal=load('ts_health',{});
+const saveHealthJournal=()=>{localStorage.setItem('ts_health',JSON.stringify(healthJournal));queueServerSync();};
+function todayHealthEntry(){const d=new Date().toISOString().slice(0,10);return healthJournal[d]||{sleep:null,mood:null,note:''};}
+function setTodayHealth(patch){const d=new Date().toISOString().slice(0,10);healthJournal[d]={...todayHealthEntry(),...patch};saveHealthJournal();}
+function recentHealthEntries(n=7){
+  return Object.keys(healthJournal).sort().reverse().slice(0,n)
+    .map(d=>({date:d,...healthJournal[d]}));
+}
+
+// ===== ADVICE / SUPPORT QUOTES (rule-based, no AI, no network) =====
+const SUPPORT_QUOTES=[
+  'Маленькі кроки теж наближають до мети.',
+  'Відпочинок — це теж частина продуктивності.',
+  'Ти вже зробив(ла) більше, ніж думаєш.',
+  'Один складний день не визначає весь семестр.',
+  'Прогрес важливіший за ідеальність.',
+  'Дихай. У тебе є час розібратись з усім по черзі.',
+  'Сьогоднішні зусилля — це завтрашній результат.',
+  'Помилки — це теж частина навчання.',
+  'Ти не один(на) — усі колись губились у дедлайнах.',
+  'Невеликий перепочинок зараз — це інвестиція в завтра.'
+];
+function pluralUk(n,one,few,many){
+  const n10=n%10,n100=n%100;
+  if(n10===1&&n100!==11)return one;
+  if(n10>=2&&n10<=4&&(n100<12||n100>14))return few;
+  return many;
+}
+function pickDailyMessage(){
+  const nowTs=Date.now();
+  const openNotes=notes.filter(n=>!n.done&&n.deadline);
+  const overdue=openNotes.filter(n=>new Date(n.deadline).getTime()<nowTs);
+  const dueSoon=openNotes.filter(n=>{const t=new Date(n.deadline).getTime();return t>=nowTs&&t-nowTs<=24*3600*1000;});
+  if(overdue.length)return{icon:'⚠️',title:'Прострочені завдання',text:`У тебе ${overdue.length} ${pluralUk(overdue.length,'прострочена нотатка','прострочені нотатки','прострочених нотаток')}. Може, час розібратись з однією?`};
+  if(dueSoon.length)return{icon:'⏳',title:'Дедлайн близько',text:`${dueSoon.length} ${pluralUk(dueSoon.length,'нотатка','нотатки','нотаток')} з дедлайном протягом доби — не забудь.`};
+  const recentSleep=recentHealthEntries(3).filter(e=>e.sleep!=null);
+  if(recentSleep.length>=2){
+    const avg=recentSleep.reduce((s,e)=>s+e.sleep,0)/recentSleep.length;
+    if(avg<6)return{icon:'😴',title:'Мало сну',text:'Останні дні сну було менше 6 годин — спробуй лягти трохи раніше.'};
+  }
+  const di=todayIdx(),sdi=effIdx(di,new Date().toISOString().slice(0,10));
+  const todaySlots=(schedule[sdi]||[]).length;
+  if(todaySlots>=5)return{icon:'🔥',title:'Насичений день',text:`Сьогодні ${todaySlots} пар — не забувай про перерви й воду.`};
+  const seed=new Date().toISOString().slice(0,10).split('-').reduce((a,c)=>a+Number(c),0);
+  return{icon:'💬',title:'На сьогодні',text:SUPPORT_QUOTES[seed%SUPPORT_QUOTES.length]};
+}
+
+function nextSaturdayInfo(){
+  const d=new Date(),day=d.getDay(),diff=(6-day+7)%7;
+  const target=new Date(d);target.setDate(d.getDate()+diff);
+  const dateStr=target.toISOString().slice(0,10);
+  const idx=resolveSatIndex(dateStr);
+  const overridden=!!(satRotation.overrides&&Object.prototype.hasOwnProperty.call(satRotation.overrides,dateStr));
+  return{dateStr,label:target.toLocaleDateString('uk-UA',{day:'2-digit',month:'2-digit'}),idx,name:SAT_ROT_DAYS[idx],overridden};
+}
 
 let ctab='today',eday=0,eidx=null,editingSubjId=null,allView='days',selColor=COLORS[0];
 const expandedItems=new Set();
@@ -847,6 +977,43 @@ function applyTheme(){
   if(cfg.theme==='custom'&&cfg.customColor) applyCustomColor(cfg.customColor);
 }
 applyTheme();
+
+// ===== HOLIDAY FX =====
+const HOLIDAYS=[
+  {from:'12-20',to:'01-14',emoji:['❄️','❄','✨'],name:'Новорічні свята'},
+  {from:'02-14',to:'02-14',emoji:['💝','💗'],name:'День Валентина'},
+  {from:'03-08',to:'03-08',emoji:['🌷','🌸'],name:"8 березня"},
+  {from:'08-24',to:'08-24',emoji:['💙','💛'],name:'День Незалежності'},
+  {from:'10-31',to:'10-31',emoji:['🎃','🦇'],name:'Хелловін'}
+];
+function currentHoliday(){
+  const d=new Date(),md=String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  for(const h of HOLIDAYS){
+    if(h.from<=h.to){if(md>=h.from&&md<=h.to)return h;}
+    else{if(md>=h.from||md<=h.to)return h;}
+  }
+  return null;
+}
+function renderHolidayFx(){
+  const old=document.getElementById('holiday-fx');if(old)old.remove();
+  if(!cfg.holidayFx)return;
+  const h=currentHoliday();if(!h)return;
+  if(!document.getElementById('holiday-fx-style')){
+    const st=document.createElement('style');st.id='holiday-fx-style';
+    st.textContent='@keyframes holidayFall{0%{transform:translateY(-10vh) rotate(0deg);opacity:0}10%{opacity:.9}100%{transform:translateY(110vh) rotate(360deg);opacity:.7}}.hfx-p{position:fixed;top:-10vh;pointer-events:none;user-select:none;animation:holidayFall linear infinite}';
+    document.head.appendChild(st);
+  }
+  const wrap=document.createElement('div');wrap.id='holiday-fx';wrap.style.cssText='position:fixed;inset:0;pointer-events:none;overflow:hidden;z-index:2';
+  for(let i=0;i<16;i++){
+    const sp=document.createElement('span');sp.className='hfx-p';
+    sp.textContent=h.emoji[Math.floor(Math.random()*h.emoji.length)];
+    const left=(Math.random()*100).toFixed(1),dur=(8+Math.random()*10).toFixed(1),delay=(Math.random()*14).toFixed(1),size=(14+Math.random()*14).toFixed(0);
+    sp.style.cssText=`left:${left}vw;font-size:${size}px;animation-duration:${dur}s;animation-delay:-${delay}s`;
+    wrap.appendChild(sp);
+  }
+  document.body.appendChild(wrap);
+}
+renderHolidayFx();
 
 // ===== HELPERS =====
 function getSubj(id){return subjects.find(s=>s.id===id)||{name:'?',teacher:'',link:'',gclass:'',color:'#444'};}
@@ -932,11 +1099,20 @@ function dayProgress(slots,nm){
 function renderToday(){
   const {tot:nm}=now();
   const di=todayIdx();
-  const slots=[...(schedule[di]||[]),...oneOffLessons.filter(x=>x.date===new Date().toISOString().slice(0,10))].sort((a,b)=>t2m(a.time)-t2m(b.time));
+  const todayStr=new Date().toISOString().slice(0,10);
+  const sdi=effIdx(di,todayStr);
+  const isRotatedSat=di===5&&satRotation.enabled;
+  const slots=[...(schedule[sdi]||[]),...oneOffLessons.filter(x=>x.date===todayStr)].sort((a,b)=>t2m(a.time)-t2m(b.time));
   const cur=slots.find(sl=>stat(sl,nm)==='on');
   const nxt=slots.find(sl=>stat(sl,nm)==='up');
   const name=cfg.name||localStorage.getItem('ts_nickname')||'Студенте';
   let h='';
+
+  const dm=pickDailyMessage();
+  h+=`<div class="card" style="padding:13px 15px;margin-bottom:12px;display:flex;gap:10px;align-items:flex-start">
+    <span style="font-size:20px;line-height:1">${dm.icon}</span>
+    <div><div style="font-size:11px;font-weight:800;letter-spacing:1px;text-transform:uppercase;color:var(--text4);margin-bottom:3px">${esc(dm.title)}</div><div style="font-size:13px;color:var(--text2);line-height:1.4">${esc(dm.text)}</div></div>
+  </div>`;
 
   if(cur){
     const subj=getSubj(cur.subjId);
@@ -975,13 +1151,14 @@ function renderToday(){
     } else if(slots.length){
       h+=`<div class="sbar sbar-neutral"><span class="ebig">✅</span><div style="font-weight:800;font-size:16px">Всі пари завершено!</div><div style="color:var(--text3);font-size:12px;margin-top:5px">Гарного відпочинку, ${esc(name)}!</div></div>`;
     } else {
-      h+=`<div class="sbar sbar-neutral"><span class="ebig">${isWeekend(di)?'🎉':'📭'}</span><div style="font-weight:800;font-size:16px">${isWeekend(di)?'Сьогодні вихідний!':'Сьогодні пар немає'}</div><div style="color:var(--text3);font-size:12px;margin-top:5px">${isWeekend(di)?'Відпочивай, '+esc(name)+'!':''}</div></div>`;
+      const treatAsOff=isWeekend(di)&&!isRotatedSat;
+      h+=`<div class="sbar sbar-neutral"><span class="ebig">${treatAsOff?'🎉':'📭'}</span><div style="font-weight:800;font-size:16px">${treatAsOff?'Сьогодні вихідний!':'Сьогодні пар немає'}</div><div style="color:var(--text3);font-size:12px;margin-top:5px">${treatAsOff?'Відпочивай, '+esc(name)+'!':''}</div></div>`;
     }
   }
   if(slots.length){
     const dp=dayProgress(slots,nm);
     const doneCount=slots.filter(sl=>stat(sl,nm)==='done').length;
-    h+=`<div style="font-size:10px;letter-spacing:2px;color:var(--text4);font-weight:800;text-transform:uppercase;margin-bottom:10px">${DAYS[di]} · ${slots.length} пар</div>
+    h+=`<div style="font-size:10px;letter-spacing:2px;color:var(--text4);font-weight:800;text-transform:uppercase;margin-bottom:10px">${DAYS[di]}${isRotatedSat?' · за '+SAT_ROT_DAYS[sdi]:''} · ${slots.length} пар</div>
     <div class="day-progress">
       <div class="day-progress-head"><span>Прогрес дня</span><span>${doneCount}/${slots.length} пар · ${dp}%</span></div>
       <div class="prog-track"><div class="prog-fill" style="width:${dp}%"></div></div>
@@ -1378,6 +1555,35 @@ async function fireNoteReminder(note,kind,title,body){
     try{const reg=await navigator.serviceWorker.ready; await reg.showNotification(title,{body:`${note.text.slice(0,100)} — ${body}`,icon:'/icon-192.png',badge:'/icon-192.png',tag:`note-${note.id}-${kind}`,renotify:true,data:{url:'/'}})}catch{}
   }
 }
+function healthReminderStore(){try{return JSON.parse(localStorage.getItem('ts_health_reminders')||'{}')}catch{return{}}}
+function saveHealthReminderStore(v){localStorage.setItem('ts_health_reminders',JSON.stringify(v))}
+async function fireHealthReminder(key,title,body){
+  const store=healthReminderStore();
+  if(store[key]&&Date.now()-store[key]<80*60*1000)return;
+  store[key]=Date.now();saveHealthReminderStore(store);
+  addNotif(title,body,'info');
+  if(Notification.permission==='granted'&&navigator.serviceWorker){
+    try{const reg=await navigator.serviceWorker.ready;await reg.showNotification(title,{body,icon:'/icon-192.png',badge:'/icon-192.png',tag:'health-'+key,renotify:true,data:{url:'/'}})}catch{}
+  }
+}
+function checkHealthReminders(){
+  if(cfg.waterReminder){
+    const store=healthReminderStore(),last=store['water']||0;
+    if(Date.now()-last>=90*60*1000)fireHealthReminder('water','💧 Час пити воду','Зроби ковток води — це важливо для концентрації.');
+  }
+  if(cfg.breakReminder){
+    const{tot:nm}=now();
+    const di=todayIdx(),sdi=effIdx(di,new Date().toISOString().slice(0,10));
+    const slots=[...(schedule[sdi]||[])].sort((a,b)=>t2m(a.time)-t2m(b.time));
+    for(let i=0;i<slots.length-1;i++){
+      const endCur=t2m(slots[i].time)+slots[i].duration,startNext=t2m(slots[i+1].time);
+      if(nm>=endCur+2&&nm<startNext&&startNext-endCur>=10){
+        fireHealthReminder('break-'+i+'-'+slots[i].time,'🧘 Перерва','Встань, розімнись і дай очам відпочити кілька хвилин.');
+        break;
+      }
+    }
+  }
+}
 async function checkNoteReminders(){
   const now=Date.now();
   for(const n of notes){
@@ -1557,8 +1763,70 @@ function renderCfg(){
     <div class="sec-row"><div class="sec-ico">${ico('alarm')}</div><div class="sec-info"><div class="sec-label">За 5 хвилин до пари</div>
       <div class="tog"><span class="tog-label">Увімкнути</span><label class="tog-sw"><input type="checkbox" ${cfg.notif5!==false?'checked':''} onchange="cfg.notif5=this.checked;saveCfg();sendScheduleToSW()"><span class="tog-slider"></span></label></div>
     </div></div>
+    <div class="sec-row"><div class="sec-ico">${ico('bell')}</div><div class="sec-info"><div class="sec-label">💧 Пити воду</div><div class="sec-sub">Нагадування приблизно раз на 1,5 години, поки застосунок відкритий.</div>
+      <div class="tog"><span class="tog-label">Увімкнути</span><label class="tog-sw"><input type="checkbox" ${cfg.waterReminder!==false?'checked':''} onchange="cfg.waterReminder=this.checked;saveCfg()"><span class="tog-slider"></span></label></div>
+    </div></div>
+    <div class="sec-row"><div class="sec-ico">${ico('bell')}</div><div class="sec-info"><div class="sec-label">🧘 Нагадування про перерву</div><div class="sec-sub">Підкаже розім'ятись, коли між парами є вільний проміжок.</div>
+      <div class="tog"><span class="tog-label">Увімкнути</span><label class="tog-sw"><input type="checkbox" ${cfg.breakReminder!==false?'checked':''} onchange="cfg.breakReminder=this.checked;saveCfg()"><span class="tog-slider"></span></label></div>
+    </div></div>
+    <div class="sec-row"><div class="sec-ico">${ico('bell')}</div><div class="sec-info"><div class="sec-label">☀️ Ранкове зведення</div><div class="sec-sub">Раз на ранок (якщо є що сказати): прострочені чи близькі дедлайни, насичений день. Безкоштовно, без AI.</div>
+      <div class="tog"><span class="tog-label">Увімкнути</span><label class="tog-sw"><input type="checkbox" ${cfg.dailySummary!==false?'checked':''} onchange="cfg.dailySummary=this.checked;saveCfg()"><span class="tog-slider"></span></label></div>
+    </div></div>
     <div class="sec-row" style="cursor:pointer" onclick="initNotifications(false)"><div class="sec-ico">${ico('phone')}</div><div class="sec-info"><div class="sec-label">Активувати сповіщення</div><div class="sec-sub">Дозволити браузеру показувати нагадування</div></div></div>
     <div class="sec-row"><div class="sec-ico">${ico('signal')}</div><div class="sec-info"><div class="sec-label">Статус push-сповіщень</div><div class="sec-sub" id="push-status" style="margin-top:4px">—</div></div></div>
+  </div>
+  <div class="sec-title">Відпрацювання по суботах</div>
+  <div class="sec-card">
+    <div class="sec-row"><div class="sec-ico">${ico('calendar')}</div><div class="sec-info">
+      <div class="sec-label">Ротація субот</div>
+      <div class="sec-sub">Кожна субота автоматично показує розклад іншого дня по черзі: Пн→Вт→Ср→Чт→Пт→знову Пн.</div>
+      <div class="tog"><span class="tog-label">Увімкнути</span><label class="tog-sw"><input type="checkbox" ${satRotation.enabled?'checked':''} onchange="satRotation.enabled=this.checked;saveSatRotation();render();sendScheduleToSW()"><span class="tog-slider"></span></label></div>
+    </div></div>
+    ${satRotation.enabled?`
+    <div class="sec-row"><div class="sec-ico">${ico('calendar')}</div><div class="sec-info">
+      <div class="sec-label">Точка відліку</div>
+      <div class="sec-sub">Вкажи одну суботу і який день вона відпрацьовує — далі рахується автоматично по колу.</div>
+      <input class="sec-input" type="date" value="${esc(satRotation.anchorDate||'')}" onchange="satRotation.anchorDate=this.value;saveSatRotation();render();sendScheduleToSW()">
+      <select class="sec-input" style="margin-top:7px" onchange="satRotation.anchorDayIdx=Number(this.value);saveSatRotation();render();sendScheduleToSW()">
+        ${SAT_ROT_DAYS.map((d,i)=>`<option value="${i}" ${Number(satRotation.anchorDayIdx)===i?'selected':''}>${d}</option>`).join('')}
+      </select>
+    </div></div>
+    ${(()=>{const ns=nextSaturdayInfo();return `
+    <div class="sec-row"><div class="sec-ico">${ico('bell')}</div><div class="sec-info">
+      <div class="sec-label">Найближча субота: ${esc(ns.label)}</div>
+      <div class="sec-sub">За розрахунком — <b>${esc(ns.name)}</b>${ns.overridden?' (вручну змінено)':''}. Зміни тут, якщо оголосили інакше.</div>
+      <select class="sec-input" onchange="satRotation.overrides=satRotation.overrides||{};satRotation.overrides['${ns.dateStr}']=Number(this.value);saveSatRotation();render();sendScheduleToSW()">
+        ${SAT_ROT_DAYS.map((d,i)=>`<option value="${i}" ${ns.idx===i?'selected':''}>${d}</option>`).join('')}
+      </select>
+      ${ns.overridden?`<button class="vtbtn" style="margin-top:7px" onclick="delete satRotation.overrides['${ns.dateStr}'];saveSatRotation();render();sendScheduleToSW()">Скинути до автоматичного</button>`:''}
+    </div></div>`;})()}
+    `:''}
+  </div>
+  <div class="sec-title">Здоров'я та добробут</div>
+  <div class="sec-card">
+    <div class="sec-row"><div class="sec-ico">${ico('calendar')}</div><div class="sec-info">
+      <div class="sec-label">🎉 Святкові ефекти</div>
+      <div class="sec-sub">Легка анімація (сніжинки, конфеті тощо) у святкові дні.</div>
+      <div class="tog"><span class="tog-label">Увімкнути</span><label class="tog-sw"><input type="checkbox" ${cfg.holidayFx!==false?'checked':''} onchange="cfg.holidayFx=this.checked;saveCfg();renderHolidayFx()"><span class="tog-slider"></span></label></div>
+    </div></div>
+    <div class="sec-row"><div class="sec-ico">${ico('bell')}</div><div class="sec-info">
+      <div class="sec-label">Завантаженість тижня</div>
+      <div class="sec-sub">${(()=>{const c=[0,1,2,3,4,5,6].reduce((s,i)=>{if(i===5&&satRotation.enabled){const d=nextSaturdayInfo();return s+(schedule[effIdx(5,d.dateStr)]||[]).length;}return s+(schedule[i]||[]).length;},0);return `${c} ${pluralUk(c,'пара','пари','пар')} запланов${c===1?'ана':'ано'} на тиждень.`;})()}</div>
+    </div></div>
+  </div>
+  <div class="sec-card">
+    <div class="sec-row"><div class="sec-ico">${ico('user')}</div><div class="sec-info" style="width:100%">
+      <div class="sec-label">Щоденник самопочуття — сьогодні</div>
+      <div class="sec-sub" style="margin-bottom:9px">Скільки спав(ла) і як настрій — пару секунд, щоб відстежувати тенденцію.</div>
+      ${(()=>{const e=todayHealthEntry();return `
+      <div style="display:flex;gap:7px;margin-bottom:9px">
+        ${[1,2,3,4,5].map(m=>`<button class="vtbtn" style="flex:1;font-size:18px;${e.mood===m?'background:var(--accent);border-color:var(--accent)':''}" onclick="setTodayHealth({mood:${m}});renderCfg()">${['😞','😕','😐','🙂','😄'][m-1]}</button>`).join('')}
+      </div>
+      <input class="sec-input" type="number" min="0" max="24" step="0.5" placeholder="Годин сну" value="${e.sleep??''}" onchange="setTodayHealth({sleep:this.value===''?null:Number(this.value)})">
+      <input class="sec-input" style="margin-top:7px" type="text" maxlength="300" placeholder="Нотатка (необов'язково)" value="${esc(e.note||'')}" onchange="setTodayHealth({note:this.value})">
+      `;})()}
+      ${(()=>{const hist=recentHealthEntries(7).filter(x=>x.date!==new Date().toISOString().slice(0,10));if(!hist.length)return'';return `<div style="margin-top:11px;display:grid;gap:5px">${hist.map(x=>`<div style="display:flex;justify-content:space-between;font-size:11px;color:var(--text3)"><span>${x.date.slice(5)}</span><span>${x.mood?['😞','😕','😐','🙂','😄'][x.mood-1]:'—'} ${x.sleep!=null?x.sleep+'г сну':''}</span></div>`).join('')}</div>`;})()}
+    </div></div>
   </div>
   <div class="sec-title">Тема</div>
   <div class="sec-card"><div class="sec-row"><div class="sec-ico">${ico('palette')}</div><div class="sec-info"><div class="sec-label">Колір акценту</div>
@@ -2205,7 +2473,7 @@ function queueServerSync(immediate=false,retriesLeft=3){
   const run=()=>{
     syncInFlight=fetch('/.netlify/functions/save-schedule',{
       method:'POST',headers:{'Content-Type':'application/json',...authHeaders()},
-      body:JSON.stringify({schedule,subjects,cfg,notes,oneOffLessons,baseUpdatedAt:lastSyncedTs})
+      body:JSON.stringify({schedule,subjects,cfg,notes,oneOffLessons,satRotation,healthJournal,baseUpdatedAt:lastSyncedTs})
     }).then(async res=>{
       if(res.status===409){
         // Another device saved first. Don't throw away whatever's still
@@ -2250,7 +2518,11 @@ async function pullFromServer(){
     notes=data.notes||notes;
     oneOffLessons=Array.isArray(data.oneOffLessons)?data.oneOffLessons:oneOffLessons;
     localStorage.setItem('ts_oneoff',JSON.stringify(oneOffLessons));
-    cfg={...cfg,...(data.theme?{theme:data.theme,font:data.font,time24:data.time24,megaLink:data.megaLink,glass:data.glass,animBg:data.animBg,gradText:data.gradText,clockStyle:data.clockStyle,clockSecs:data.clockSecs,tabAnim:data.tabAnim,bgPreset:data.bgPreset,splashAnim:data.splashAnim,periods:data.periods||cfg.periods}:{}),notif10:data.notif10!==false,notif5:data.notif5!==false};
+    satRotation=data.satRotation&&typeof data.satRotation==='object'?data.satRotation:satRotation;
+    localStorage.setItem('ts_satrot',JSON.stringify(satRotation));
+    healthJournal=data.healthJournal&&typeof data.healthJournal==='object'?data.healthJournal:healthJournal;
+    localStorage.setItem('ts_health',JSON.stringify(healthJournal));
+    cfg={...cfg,...(data.theme?{theme:data.theme,font:data.font,time24:data.time24,megaLink:data.megaLink,glass:data.glass,animBg:data.animBg,gradText:data.gradText,clockStyle:data.clockStyle,clockSecs:data.clockSecs,tabAnim:data.tabAnim,bgPreset:data.bgPreset,splashAnim:data.splashAnim,periods:data.periods||cfg.periods}:{}),notif10:data.notif10!==false,notif5:data.notif5!==false,holidayFx:data.holidayFx!==false,waterReminder:data.waterReminder!==false,breakReminder:data.breakReminder!==false,dailySummary:data.dailySummary!==false};
     applyTheme();
     localStorage.setItem('ts_sch',JSON.stringify(schedule));
     localStorage.setItem('ts_subjs',JSON.stringify(subjects));
@@ -2292,7 +2564,8 @@ function renderPushStatus(){
 function sendScheduleToSW(){
   if(!navigator.serviceWorker?.controller)return;
   const di=todayIdx();
-  const slots=(schedule[di]||[]).map(sl=>{
+  const sdi=effIdx(di,new Date().toISOString().slice(0,10));
+  const slots=(schedule[sdi]||[]).map(sl=>{
     const s=getSubj(sl.subjId);
     return{time:sl.time,name:s.name,teacher:s.teacher||'',notif10:cfg.notif10!==false,notif5:cfg.notif5!==false};
   });
@@ -2315,6 +2588,8 @@ if(navigator.serviceWorker){
 setInterval(()=>{if(Notification.permission==='granted')sendScheduleToSW();},5*60*1000);
 setInterval(checkNoteReminders,30*1000);
 setTimeout(checkNoteReminders,1200);
+setInterval(checkHealthReminders,5*60*1000);
+setTimeout(checkHealthReminders,1500);
 
 // ===== OFFLINE =====
 function updateOnline(){const b=document.getElementById('offline-bar');navigator.onLine?setTimeout(()=>b.style.display='none',2000):b.style.display='block';}
@@ -2415,6 +2690,71 @@ function renderNotifList(){
 }
 
 updateBellBadge();
+
+// ===== AI CHAT =====
+let aiChatHistory=load('ts_ai_chat',[]);
+let aiPendingActions=[]; // {summary, action:{tool,args}}
+const saveAiChatHistory=()=>{localStorage.setItem('ts_ai_chat',JSON.stringify(aiChatHistory.slice(-40)));};
+function toggleAiChat(){
+  const panel=document.getElementById('ai-chat-panel'),overlay=document.getElementById('ai-chat-overlay');
+  const isOpen=panel.style.display==='flex';
+  if(isOpen){panel.style.display='none';overlay.style.display='none';}
+  else{panel.style.display='flex';overlay.style.display='block';renderAiChatList();setTimeout(()=>document.getElementById('ai-chat-input')?.focus(),200);}
+}
+function aiAvatarState(state){
+  const btn=document.getElementById('ai-avatar-btn');if(!btn)return;
+  btn.classList.remove('ai-thinking','ai-talking');
+  if(state==='thinking')btn.classList.add('ai-thinking');
+  if(state==='talking'){btn.classList.add('ai-talking');setTimeout(()=>btn.classList.remove('ai-talking'),2200);}
+}
+function renderAiChatList(){
+  const list=document.getElementById('ai-chat-list');if(!list)return;
+  let h=aiChatHistory.map(m=>`<div class="ai-msg ${m.role==='user'?'user':'bot'}">${esc(m.content)}</div>`).join('');
+  h+=aiPendingActions.map((p,i)=>`<div class="ai-msg confirm"><div style="margin-bottom:8px">${esc(p.summary||'')}</div><div style="display:flex;gap:8px"><button class="vtbtn" onclick="confirmAiAction(${i},true)">Підтвердити</button><button class="vtbtn" onclick="confirmAiAction(${i},false)">Скасувати</button></div></div>`).join('');
+  list.innerHTML=h||`<div style="color:var(--text4);font-size:12px;text-align:center;margin-top:30px">Привіт 👋 Запитай щось про розклад, завдання чи попроси пораду.</div>`;
+  list.scrollTop=list.scrollHeight;
+}
+async function sendAiChat(){
+  const input=document.getElementById('ai-chat-input');
+  const text=(input.value||'').trim();
+  if(!text||aiPendingActions.length)return;
+  input.value='';
+  aiChatHistory.push({role:'user',content:text});saveAiChatHistory();renderAiChatList();
+  aiAvatarState('thinking');
+  const statusEl=document.getElementById('ai-chat-status');if(statusEl)statusEl.textContent='думає…';
+  try{
+    const r=await fetch('/.netlify/functions/ai-chat',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({message:text,history:aiChatHistory.slice(0,-1).slice(-12)})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok){aiChatHistory.push({role:'assistant',content:d.error||'Сталася помилка, спробуй ще раз.'});}
+    else if(d.needsConfirm){
+      aiPendingActions=(d.pending||[]).map(p=>({action:p.action,summary:p.summary||'Підтвердити дію?'}));
+      if(d.dataChanged)pullFromServer();
+    }else{
+      aiChatHistory.push({role:'assistant',content:d.reply||'…'});
+      if(d.dataChanged)pullFromServer();
+    }
+  }catch(e){aiChatHistory.push({role:'assistant',content:'Не вдалося зв\u2019язатись з сервером.'});}
+  saveAiChatHistory();
+  if(statusEl)statusEl.textContent='онлайн';
+  aiAvatarState('talking');
+  renderAiChatList();
+}
+async function confirmAiAction(idx,yes){
+  const p=aiPendingActions[idx];if(!p)return;
+  aiPendingActions=aiPendingActions.filter((_,i)=>i!==idx);
+  if(!yes){aiChatHistory.push({role:'assistant',content:'Гаразд, скасував.'});saveAiChatHistory();renderAiChatList();return;}
+  renderAiChatList();
+  aiAvatarState('thinking');
+  try{
+    const r=await fetch('/.netlify/functions/ai-chat',{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/json',...authHeaders()},body:JSON.stringify({confirmedAction:{tool:p.action.tool,args:p.action.args}})});
+    const d=await r.json().catch(()=>({}));
+    aiChatHistory.push({role:'assistant',content:d.reply||(r.ok?'Готово.':'Сталася помилка.')});
+    if(d.dataChanged)pullFromServer();
+  }catch(e){aiChatHistory.push({role:'assistant',content:'Не вдалося виконати дію.'});}
+  saveAiChatHistory();
+  aiAvatarState('talking');
+  renderAiChatList();
+}
 
 // ===== INIT =====
 renderToday();
