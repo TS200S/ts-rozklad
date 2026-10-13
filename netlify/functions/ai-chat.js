@@ -3,7 +3,11 @@ const { store, atomicUpdateJSON } = require('./lib/store');
 const { validateSession, extractToken } = require('./lib/session');
 const { enforceIpBan, isSameOriginRequest, rateLimit, getClientIp } = require('./lib/security');
 
-const GROQ_MODEL = 'llama-3.3-70b-versatile';
+// llama-3.3-70b-versatile was decommissioned by Groq on 2026-08-16.
+// openai/gpt-oss-120b is Groq's official recommended replacement and
+// supports tool calling. If Groq retires this one too, check
+// console.groq.com/docs/models for the current recommendation.
+const GROQ_MODEL = 'openai/gpt-oss-120b';
 const GROQ_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
 function cleanText(v, n = 2000) { return String(v ?? '').slice(0, n); }
@@ -283,7 +287,7 @@ exports.handler = async (event) => {
     return { statusCode: 200, headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }, body: JSON.stringify({ reply: finalText, dataChanged: anyChanged }) };
   } catch (err) {
     const requestId = String(event.headers?.['x-nf-request-id'] || event.headers?.['X-Nf-Request-Id'] || '').slice(0, 80);
-    console.error('ai-chat failed', { requestId, code: err?.code || err?.status || 'UNKNOWN', name: err?.name || 'Error' });
+    console.error('ai-chat failed', { requestId, status: err?.status || 'UNKNOWN', name: err?.name || 'Error', message: err?.message, groqDetail: err?.detail });
     return { statusCode: 500, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ error: 'Не вдалося звʼязатись з AI', requestId: requestId || undefined }) };
   }
 };
