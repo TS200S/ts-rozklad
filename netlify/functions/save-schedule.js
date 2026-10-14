@@ -1,24 +1,9 @@
 const { store, atomicUpdateJSON } = require('./lib/store');
 const { validateSession, extractToken } = require('./lib/session');
 const { enforceIpBan, isSameOriginRequest } = require('./lib/security');
+const { safeHealthJournal, safeHealthGoals } = require('./lib/health');
 function safeUrl(v){try{const u=new URL(String(v||''));return ['http:','https:'].includes(u.protocol)?u.toString().slice(0,1000):'';}catch{return '';}}
 function cleanText(v,n=2000){return String(v??'').slice(0,n);}
-function safeHealthJournal(v){
-  const r=v&&typeof v==='object'&&!Array.isArray(v)?v:{};
-  const out={};
-  for(const k of Object.keys(r).slice(0,400)){
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(k))continue;
-    const e=r[k];if(!e||typeof e!=='object'||Array.isArray(e))continue;
-    const sleep=Number(e.sleep);
-    const mood=Number(e.mood);
-    out[k]={
-      sleep:Number.isFinite(sleep)&&sleep>=0&&sleep<=24?sleep:null,
-      mood:Number.isInteger(mood)&&mood>=1&&mood<=5?mood:null,
-      note:cleanText(e.note,300)
-    };
-  }
-  return out;
-}
 function safeSatRotation(v){
   const r=v&&typeof v==='object'&&!Array.isArray(v)?v:{};
   const anchorDate=/^\d{4}-\d{2}-\d{2}$/.test(String(r.anchorDate||''))?String(r.anchorDate):'';
@@ -75,7 +60,7 @@ exports.handler = async (event) => {
     const ipBan=await enforceIpBan(s,event); if(ipBan)return{statusCode:403,body:JSON.stringify({error:'Цей IP-адрес заблоковано'})};
     const sess=await validateSession(s,extractToken(event),event); if(!sess)return{statusCode:401,body:JSON.stringify({error:'Сесія недійсна, увійди ще раз'})}; if(sess.banned)return{statusCode:403,body:JSON.stringify({error:'Акаунт заблоковано'})};
     if(String(event.body||'').length>900000)return{statusCode:413,body:JSON.stringify({error:'Дані розкладу завеликі'})};
-    const body=JSON.parse(event.body||'{}'); const {schedule,subjects,cfg,notes,oneOffLessons,satRotation,healthJournal}=body;
+    const body=JSON.parse(event.body||'{}'); const {schedule,subjects,cfg,notes,oneOffLessons,satRotation,healthJournal,healthGoals}=body;
     if(!schedule||!Array.isArray(subjects))return{statusCode:400,body:JSON.stringify({error:'Немає даних розкладу'})};
     const baseUpdatedAt=Number(body.baseUpdatedAt||0);
     const current=await s.get(`schedule-data:${sess.userId}`,{type:'json',consistency:'strong'}).catch(()=>null);
@@ -87,7 +72,7 @@ exports.handler = async (event) => {
     const saved=await atomicUpdateJSON(`schedule-data:${sess.userId}`, current || {schedule:[],subjects:[],notes:[],oneOffLessons:[]}, existing=>{
       const nowCurrent=existing||{};
       if(baseUpdatedAt && Number(nowCurrent.updatedAt||0)>baseUpdatedAt){const err=new Error('SCHEDULE_CONFLICT');err.code='SCHEDULE_CONFLICT';throw err;}
-      return {schedule,subjects:safeSubjects,notes:newNotes,oneOffLessons:safeOneOff,satRotation:safeSatRotation(satRotation),healthJournal:safeHealthJournal(healthJournal),...safeCfg(cfg),updatedAt:Date.now()};
+      return {schedule,subjects:safeSubjects,notes:newNotes,oneOffLessons:safeOneOff,satRotation:safeSatRotation(satRotation),healthJournal:safeHealthJournal(healthJournal),healthGoals:safeHealthGoals(healthGoals),...safeCfg(cfg),updatedAt:Date.now()};
     });
 
     // Whole-note deletions are reconciled by the admin orphan cleanup. We do not

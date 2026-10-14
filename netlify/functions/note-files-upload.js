@@ -16,7 +16,7 @@ const ALLOWED = new Set([
   'application/msword','application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   'application/vnd.ms-excel','application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   'application/vnd.ms-powerpoint','application/vnd.openxmlformats-officedocument.presentationml.presentation',
-  'application/zip'
+  'application/zip','text/csv','text/markdown','application/json'
 ]);
 
 function json(statusCode, body) {
@@ -30,7 +30,7 @@ function hasMagic(bytes, mime) {
   if (mime === 'application/pdf') return bytes.subarray(0, 5).toString('ascii') === '%PDF-';
   if (mime === 'application/zip' || /openxmlformats/.test(mime)) return bytes.length >= 4 && bytes[0] === 0x50 && bytes[1] === 0x4b;
   if (/^application\/ms(?:word|excel|powerpoint)$/.test(mime)) return bytes.length >= 8 && bytes.subarray(0, 8).equals(Buffer.from([0xD0,0xCF,0x11,0xE0,0xA1,0xB1,0x1A,0xE1]));
-  if (mime === 'text/plain') return !bytes.subarray(0, 1024).includes(0);
+  if (mime === 'text/plain' || mime === 'text/csv' || mime === 'text/markdown' || mime === 'application/json') return !bytes.subarray(0, 1024).includes(0);
   return false;
 }
 function bodyBytes(event) {
