@@ -11,6 +11,14 @@
 [functions."cleanup-bans"]
   schedule = "*/15 * * * *"
 
+# Daily top-up of the shared quote pool (AI + Wikiquote, verified against the source text).
+[functions."quotes-refill"]
+  schedule = "0 3 * * *"
+
+# The AI assistant may chain several model/web calls; allow the maximum synchronous time.
+[functions."ai-chat"]
+  timeout = 26
+
 
 
 [[headers]]

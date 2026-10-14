@@ -35,6 +35,13 @@ tbody tr:hover{background:rgba(96,165,250,.035)}
 .box{box-shadow:0 25px 90px rgba(0,0,0,.65);border-color:rgba(96,165,250,.18)}
 @media(max-width:900px){.stats{grid-template-columns:repeat(2,1fr)}.admin-hero{align-items:flex-start;flex-direction:column}}
 @media(max-width:520px){.stats{grid-template-columns:1fr 1fr}.hero-title{font-size:20px}}
+
+/* AI admin tab */
+.cfg-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:10px}
+.aicheck{display:flex;align-items:center;gap:8px;background:var(--bg3);border:1px solid var(--border);border-radius:10px;padding:10px 12px;font-size:12px;font-weight:700;cursor:pointer}
+.aicheck input{width:16px;height:16px}
+.aibar{height:4px;border-radius:3px;background:var(--bg3);margin-top:5px;overflow:hidden}.aibar i{display:block;height:100%;background:var(--accent2)}
+#aiDiagResult .security-grid{display:grid;gap:8px}
 </style>
 </head>
 <body>
@@ -127,26 +134,26 @@ function render(){
   const root=document.getElementById('root');
   const active=users.filter(u=>!u.banned).length,banned=users.filter(u=>u.banned).length,admins=users.filter(u=>u.role==='admin').length,sessions=users.reduce((n,u)=>n+u.sessionsCount,0);
   root.innerHTML=`<div id="security-alert-bar" style="display:none;margin-bottom:12px"></div><div class="stats"><div class="stat"><b>${users.length}</b><span>Користувачів</span></div><div class="stat"><b>${active}</b><span>Активних</span></div><div class="stat"><b>${banned}</b><span>Заблокованих</span></div><div class="stat"><b>${sessions}</b><span>Активних сесій</span></div></div>
-  <div class="tabs"><button class="tab ${currentTab==='users'?'active':''}" onclick="switchTab('users')">👥 Користувачі</button><button class="tab ${currentTab==='security'?'active':''}" onclick="switchTab('security')">🛡️ Безпека</button><button class="tab ${currentTab==='ips'?'active':''}" onclick="switchTab('ips')">🚫 IP-блокування</button><button class="tab ${currentTab==='audit'?'active':''}" onclick="switchTab('audit')">📋 Журнал</button><button class="tab ${currentTab==='storage'?'active':''}" onclick="switchTab('storage')">📦 Сховище</button></div>
+  <div class="tabs"><button class="tab ${currentTab==='users'?'active':''}" onclick="switchTab('users')">👥 Користувачі</button><button class="tab ${currentTab==='security'?'active':''}" onclick="switchTab('security')">🛡️ Безпека</button><button class="tab ${currentTab==='ips'?'active':''}" onclick="switchTab('ips')">🚫 IP-блокування</button><button class="tab ${currentTab==='audit'?'active':''}" onclick="switchTab('audit')">📋 Журнал</button><button class="tab ${currentTab==='storage'?'active':''}" onclick="switchTab('storage')">📦 Сховище</button><button class="tab ${currentTab==='ai'?'active':''}" onclick="switchTab('ai')">🤖 ІІ</button></div>
   <div id="content"></div>`;
-  if(currentTab==='users')renderUsers();else if(currentTab==='security'){renderSecurityPanel();loadSecurityCheck();}else if(currentTab==='ips'){renderIps([]);loadIps();}else if(currentTab==='storage')renderStorage();else {document.getElementById('content').innerHTML='<div class="panel state">📋 Завантаження журналу...</div>';loadAudit();}loadSecurityAlerts();
+  if(currentTab==='users')renderUsers();else if(currentTab==='security'){renderSecurityPanel();loadSecurityCheck();}else if(currentTab==='ips'){renderIps([]);loadIps();}else if(currentTab==='storage')renderStorage();else if(currentTab==='ai')renderAiAdmin();else {document.getElementById('content').innerHTML='<div class="panel state">📋 Завантаження журналу...</div>';loadAudit();}loadSecurityAlerts();
 }
 async function loadSecurityAlerts(){try{const r=await fetch('/.netlify/functions/security-alerts',{cache:'no-store',credentials:'same-origin',headers:authHeaders()});const d=await r.json();const el=document.getElementById('security-alert-bar');if(!el)return;if(!r.ok){el.style.display='none';return;}if(!d.count){el.style.display='none';return;}el.style.display='block';el.innerHTML=`<div class="dangerbox" style="display:flex;justify-content:space-between;gap:10px;align-items:center"><b>🚨 Підозрілі події за 24 години: ${d.count}</b><span>${d.critical?'🔴 Критичних: '+d.critical:'🟠 Потрібна увага'}</span></div>`;}catch{}}
 function switchTab(t){currentTab=t;render()}
 function renderSecurityPanel(){
   const c=document.getElementById('content');
-  c.innerHTML=`<div class="panel"><div class="toolbar"><button class="refresh" onclick="loadSecurityCheck()">🛡️ Запустити перевірку</button><button class="btn blue" onclick="loadSystemDiagnostics()">🧪 Самодіагностика системи</button><span class="muted" style="align-self:center">Security Center перевіряє захист; самодіагностика перевіряє реальний runtime і сховище.</span></div><div id="securityResult"><div class="state">Натисни «Запустити перевірку».</div></div></div>`;
+  c.innerHTML=`<div class="panel"><div class="toolbar"><button class="refresh" onclick="loadSecurityCheck()">🛡️ Запустити перевірку</button><button class="btn blue" onclick="loadSystemDiagnostics()">🧪 Самодіагностика системи</button><button class="btn blue" onclick="loadSystemDiagnostics('site')">🧩 Перевірка коду сайту</button><button class="btn blue" onclick="switchTab('ai')">🤖 ІІ</button><span class="muted" style="align-self:center">Security Center перевіряє захист; самодіагностика перевіряє реальний runtime і сховище.</span></div><div id="securityResult"><div class="state">Натисни «Запустити перевірку».</div></div></div>`;
 }
-async function loadSystemDiagnostics(){
-  const c=document.getElementById('securityResult'); if(!c)return;
+async function loadSystemDiagnostics(scope='core',target='securityResult',deep=false){
+  const c=document.getElementById(target); if(!c)return;
   c.innerHTML='<div class="panel state">🧪 Система перевіряє сама себе...</div>';
   try{
-    const r=await fetch('/.netlify/functions/system-diagnostics',{cache:'no-store',credentials:'same-origin',headers:authHeaders()});
+    const r=await fetch('/.netlify/functions/system-diagnostics?scope='+encodeURIComponent(scope)+(deep?'&deep=1':''),{cache:'no-store',credentials:'same-origin',headers:authHeaders()});
     const d=await r.json().catch(()=>({}));
     if(!r.ok)throw new Error((d.error||'Помилка самодіагностики')+(d.requestId?' · ID: '+d.requestId:''));
-    const s=d.summary||{}, overall=s.fail?'fail':s.warn?'warn':'pass', title=s.fail?'❌ Виявлено проблему':s.warn?'⚠️ Є попередження':'✅ Система працює нормально';
+    const s=d.summary||{}, overall=s.fail?'fail':s.warn?'warn':'pass', title=s.fail?'❌ Виявлено проблему':s.warn?'⚠️ Є попередження':(scope==='site'?'✅ Код сайту в порядку':scope==='ai'?'✅ ІІ працює нормально':'✅ Система працює нормально');
     const rows=(d.checks||[]).map(x=>`<div class="security-item"><div class="top"><b>${esc(x.label)}</b><span class="badge ${x.status==='PASS'?'ok':x.status==='FAIL'?'banned':''}">${esc(x.status)}</span></div><div class="detail">${esc(x.detail||'')}</div></div>`).join('');
-    c.innerHTML=`<div class="panel"><div class="toolbar"><button class="refresh" onclick="loadSystemDiagnostics()">🔄 Перевірити ще раз</button><button class="btn blue" onclick="loadSecurityCheck()">🛡️ Security Center</button><span class="muted" style="align-self:center">Request ID: ${esc(d.requestId||'—')}</span></div><div class="security-summary ${overall}"><b style="font-size:16px">${title}</b><div class="small" style="margin-top:5px">PASS: ${s.pass||0} · WARN: ${s.warn||0} · FAIL: ${s.fail||0} · Всього: ${s.total||0}</div><div class="small">Перевірено: ${fmt(d.checkedAt||Date.now())}</div></div><div class="security-grid">${rows}</div></div>`;
+    c.innerHTML=`<div class="panel"><div class="toolbar"><button class="refresh" onclick="loadSystemDiagnostics('${scope}','${target}',${deep})">🔄 Перевірити ще раз</button>${target==='securityResult'?'<button class="btn blue" onclick="loadSecurityCheck()">🛡️ Security Center</button>':''}<span class="muted" style="align-self:center">Request ID: ${esc(d.requestId||'—')}</span></div><div class="security-summary ${overall}"><b style="font-size:16px">${title}</b><div class="small" style="margin-top:5px">PASS: ${s.pass||0} · WARN: ${s.warn||0} · FAIL: ${s.fail||0} · Всього: ${s.total||0}</div><div class="small">Перевірено: ${fmt(d.checkedAt||Date.now())}</div></div><div class="security-grid">${rows}</div></div>`;
   }catch(e){c.innerHTML=`<div class="state err">❌ Самодіагностика не виконана: ${esc(e.message||'Невідома помилка')}</div>`}
 }
 async function loadSecurityCheck(){
@@ -271,6 +278,122 @@ async function doIpBan(){try{await callAdmin('ip-ban',{ip:document.getElementByI
 async function unbanIp(ip){if(!confirm(`Розблокувати IP ${ip}?`))return;try{await callAdmin('ip-unban',{ip,confirm:'UNBAN IP'});loadIps()}catch(e){alert('❌ '+e.message)}}
 
 async function loadAudit(){try{const d=await callAdmin('audit-log');const integrity=d.integrity||{};const integrityHtml=integrity.valid===false?'<div class="dangerbox" style="margin-bottom:12px">⚠️ Виявлено порушення цілісності журналу адміністратора. Перевірте серверні журнали та доступи.</div>':'<div class="hint">🔗 Цілісність журналу: '+(integrity.valid?'підтверджена':'невідома')+' · записів: '+esc(integrity.count??(d.log||[]).length)+'</div>';const rows=(d.log||[]).map(x=>`<div class="row"><div><b>${esc(x.action)}</b><div class="small">${fmt(x.at)} · адмін: ${esc(x.adminUsername)}</div><div class="small mono">${esc(JSON.stringify(x.details||{}))}</div></div></div>`).join('');document.getElementById('content').innerHTML=`<div class="panel">${integrityHtml}${rows||'<div class="state">Журнал порожній.</div>'}</div>`}catch(e){document.getElementById('content').innerHTML=`<div class="panel state err">❌ ${esc(e.message)}</div>`}}
+// ===== AI admin tab =====
+let aiAdminData=null;
+const AI_BOOL_FIELDS=[['enabled','ІІ увімкнено для всіх'],['webSearch','Доступ в інтернет (пошук + читання сторінок)'],['files','Приймати файли в чаті (→ нотатки)'],['quotesTool','ІІ керує цитатами'],['healthTool','ІІ керує вкладкою «Здоров’я»'],['guardEnabled','🛡️ Щит безпеки: перевіряти кожне повідомлення'],['guardFailOpen','Якщо щит недоступний — пропускати повідомлення']];
+const AI_KNOWN_MODELS=['openai/gpt-oss-120b','openai/gpt-oss-20b','qwen/qwen3.8-27b','allam-2-7b'];
+const AI_NUM_FIELDS=[['maxTokens','Макс. довжина відповіді (токени)','200–16000. Groq free: ~8000 токенів/хв на запит+відповідь'],['temperature','Температура','0–1.5'],['historyMessages','Повідомлень історії в контексті','0–30'],['maxToolRounds','Макс. кроків інструментів за запит','0–8'],['timeBudgetSec','Бюджет часу, с','5–25 (таймаут функції 26 с)'],['userWindowLimit','Ліміт повідомлень у вікні (на юзера)','1–500'],['userWindowMinutes','Вікно, хв','1–1440'],['userDailyLimit','Денний ліміт на юзера (за замовч.)','0 = заборонити; 0–100000'],['globalPerMinute','Загальний ліміт на весь сайт, запитів/хв','1–600']];
+async function renderAiAdmin(){
+  const c=document.getElementById('content');
+  c.innerHTML='<div class="panel state">🤖 Завантаження налаштувань ІІ...</div>';
+  try{aiAdminData=await callAdmin('ai-overview');}catch(e){c.innerHTML=`<div class="panel state err">❌ ${esc(e.message)}</div>`;return}
+  const d=aiAdminData,cfg=d.config;
+  const bools=AI_BOOL_FIELDS.map(([k,l])=>`<label class="aicheck"><input type="checkbox" id="aic-${k}" ${cfg[k]?'checked':''}> ${esc(l)}</label>`).join('');
+  const nums=AI_NUM_FIELDS.map(([k,l,h])=>`<div class="field"><label>${esc(l)}</label><input id="aic-${k}" type="number" step="${k==='temperature'?'0.05':'1'}" value="${esc(cfg[k])}"><div class="small">${esc(h)}</div></div>`).join('');
+  const rows=d.users.map((u,i)=>{
+    const e=u.effective,a=u.access||{};
+    const st=e.enabled?'<span class="badge ok">ДОЗВОЛЕНО</span>':`<span class="badge banned">ЗАБЛОКОВАНО (${e.blockedBy==='global'?'глобально':'індивідуально'})</span>`;
+    const ov=[a.enabled===false?'🚫 вимк.':a.enabled===true?'✅ вмик.':'',a.dailyLimit!=null?`день ${a.dailyLimit}`:'',a.windowLimit!=null?`вікно ${a.windowLimit}`:'',a.maxTokens!=null?`відп. ${a.maxTokens}`:'',a.model?`🧠 ${esc(a.model)}`:'',a.webSearch===false?'без інтернету':'',a.files===false?'без файлів':'',a.note?'📝 '+esc(a.note):''].filter(Boolean).join(' · ')||'<span class="muted">за замовчуванням</span>';
+    const pct=e.dailyLimit>0?Math.min(100,Math.round(u.usage.count/e.dailyLimit*100)):100;
+    return `<tr><td><b>${esc(u.username)}</b>${u.nickname&&u.nickname!==u.username?`<div class="small">${esc(u.nickname)}</div>`:''}${u.banned?'<div><span class="badge banned">акаунт заблоковано</span></div>':''}</td><td>${st}</td><td class="mono">${u.usage.count} / ${e.dailyLimit}<div class="aibar"><i style="width:${pct}%"></i></div><div class="small">${u.usage.tokens} ток. · ${u.usage.last?fmt(u.usage.last):'—'}</div></td><td class="mono">${e.windowLimit}/${e.windowMinutes} хв · відп. ${e.maxTokens}<div class="small">${e.webSearch?'🌐':'—'} ${e.files?'📎':'—'} · цитат: ${u.quotes}</div></td><td>${ov}</td><td style="white-space:nowrap"><button class="btn blue" onclick="aiEditUser(${i})">⚙️ Доступ</button> <button class="btn gray" onclick="aiResetUsage(${i})">↺ Лічильник</button></td></tr>`;
+  }).join('');
+  const pool=d.pool;setTimeout(aiLoadIncidents,50);
+  c.innerHTML=`
+  <div class="stats" style="display:grid;gap:12px;margin-bottom:14px">
+    <div class="stat"><b>${d.hasKey?'✅':'❌'}</b><span>GROQ_API_KEY</span></div>
+    <div class="stat"><b>${cfg.enabled?'ON':'OFF'}</b><span>ІІ глобально</span></div>
+    <div class="stat"><b>${d.today.count}</b><span>Запитів сьогодні</span></div>
+    <div class="stat"><b>${d.today.tokens}</b><span>Токенів сьогодні</span></div>
+  </div>
+  <div class="panel" style="margin-bottom:14px"><h2 style="font-size:16px;margin-bottom:4px">⚙️ Глобальні налаштування ІІ</h2><div class="hint small" style="margin-bottom:12px">Модель: <span class="mono">${esc(cfg.model)}</span> · контекст 131 072 токени · макс. відповідь 65 536 · оновлено: ${cfg.updatedAt?fmt(cfg.updatedAt):'за замовчуванням'}</div>
+    <div class="cfg-grid">${bools}</div>
+    <div class="cfg-grid" style="margin-top:12px">
+      <div class="field"><label>Основна модель Groq</label><input id="aic-model" list="aiModels" value="${esc(cfg.model)}"></div>
+      <div class="field"><label>Глибина міркування</label><select id="aic-reasoningEffort">${['low','medium','high'].map(x=>`<option ${cfg.reasoningEffort===x?'selected':''}>${x}</option>`).join('')}</select><div class="small">low — швидко й економно</div></div>
+      ${nums}
+    </div>
+    <datalist id="aiModels">${AI_KNOWN_MODELS.map(m=>`<option value="${m}">`).join('')}</datalist>
+    <h3 style="font-size:13px;margin:14px 0 8px">🔀 Моделі: запасні та ролі</h3>
+    <div class="cfg-grid">
+      <div class="field"><label>Запасні моделі (по порядку, через кому)</label><input id="aic-fallbackModels" list="aiModels" value="${esc((cfg.fallbackModels||[]).join(', '))}"><div class="small">Якщо основна дала 429/помилку/таймаут — запит автоматично йде на наступну. Ліміти Groq окремі для кожної моделі.</div></div>
+      <div class="field"><label>Модель звітів для адміна</label><input id="aic-reportModel" list="aiModels" value="${esc(cfg.reportModel)}"><div class="small">Пише текстові звіти про безпеку й використання</div></div>
+    </div>
+    <h3 style="font-size:13px;margin:14px 0 8px">🛡️ Щит безпеки (Prompt Guard)</h3>
+    <div class="cfg-grid">
+      <div class="field"><label>Модель-щит</label><input id="aic-guardModel" value="${esc(cfg.guardModel)}"><div class="small">Класифікатор: лише «атака / ок», тексту не пише</div></div>
+      <div class="field"><label>Режим</label><select id="aic-guardMode"><option value="block" ${cfg.guardMode==='block'?'selected':''}>block — блокувати</option><option value="log" ${cfg.guardMode==='log'?'selected':''}>log — лише записувати</option></select></div>
+      <div class="field"><label>Поріг (0.05–0.999)</label><input id="aic-guardThreshold" type="number" step="0.05" value="${esc(cfg.guardThreshold)}"><div class="small">Менше — суворіше, більше хибних спрацювань</div></div>
+      <div class="field"><label>Авто-блок ІІ після N спроб за добу</label><input id="aic-guardAutoBlockStrikes" type="number" value="${esc(cfg.guardAutoBlockStrikes)}"><div class="small">0 = ніколи</div></div>
+    </div>
+    <div class="field" style="margin-top:12px"><label>Повідомлення, коли ІІ вимкнено</label><input id="aic-disabledMessage" value="${esc(cfg.disabledMessage)}"></div>
+    <div class="toolbar"><button class="refresh" onclick="aiSaveConfig()">💾 Зберегти налаштування</button><button class="btn gray" onclick="aiFillDefaults()">↩ Підставити стандартні</button></div>
+  </div>
+  <div class="panel" style="margin-bottom:14px"><h2 style="font-size:16px;margin-bottom:10px">👥 Доступ і ліміти по користувачах</h2><div class="wrap"><table style="min-width:900px"><thead><tr><th>Користувач</th><th>Статус</th><th>Сьогодні</th><th>Ефективні ліміти</th><th>Індивідуальні правила</th><th></th></tr></thead><tbody>${rows||'<tr><td colspan="6" class="muted">Немає користувачів</td></tr>'}</tbody></table></div></div>
+  <div class="panel" style="margin-bottom:14px"><h2 style="font-size:16px;margin-bottom:6px">💬 Запас цитат</h2><div class="small" style="margin-bottom:10px">У спільному пулі: <b>${pool.size}</b> (перевірено за джерелом: ${pool.verified}). Щодоби о 03:00 UTC пул поповнюється автоматично (Вікіцитати + ІІ, цитата береться лише якщо дослівно є на сторінці).</div>${pool.sample.map(q=>`<div class="small" style="margin-bottom:4px">«${esc(q.text)}» — ${esc(q.author)}${q.source?', '+esc(q.source):''}</div>`).join('')}<div class="toolbar" style="margin-top:10px"><button class="btn blue" onclick="aiRefillQuotes()">➕ Поповнити цитати зараз</button></div></div>
+  <div class="panel" style="margin-bottom:14px"><h2 style="font-size:16px;margin-bottom:6px">🛡️ Інциденти безпеки ІІ</h2><div class="toolbar"><button class="refresh" onclick="aiLoadIncidents()">🔄 Оновити</button><button class="btn blue" onclick="aiMakeReport()">📝 Звіт від ІІ (${esc(cfg.reportModel)})</button><button class="btn del" onclick="aiClearIncidents()">Очистити</button></div><div id="aiReport"></div><div id="aiIncidents"><div class="small">Завантаження…</div></div></div>
+  <div class="panel"><h2 style="font-size:16px;margin-bottom:6px">🩺 Діагностика</h2><div class="toolbar"><button class="refresh" onclick="loadSystemDiagnostics('ai','aiDiagResult',false)">🩺 Діагностика ІІ</button><button class="btn blue" onclick="loadSystemDiagnostics('ai','aiDiagResult',true)">🔬 Глибока (tool calling)</button><button class="btn blue" onclick="loadSystemDiagnostics('site','aiDiagResult',false)">🧩 Перевірка коду сайту</button><button class="btn gray" onclick="loadSystemDiagnostics('all','aiDiagResult',true)">Усе разом</button></div><div class="small" style="margin-bottom:8px">Діагностика ІІ робить 1–3 реальні виклики Groq і пошуку. Перевірка коду сайту розбирає розгорнутий index.html: синтаксис скриптів, кнопки вкладок, обробники onclick, ключові елементи.</div><div id="aiDiagResult"></div></div>`;
+}
+async function aiLoadIncidents(){
+  const el=document.getElementById('aiIncidents');if(!el)return;
+  try{const d=await callAdmin('ai-incidents');const l=d.incidents||[];
+    el.innerHTML=l.length?`<div class="wrap"><table style="min-width:700px"><thead><tr><th>Час</th><th>Користувач</th><th>IP</th><th>Оцінка</th><th>Дія</th><th>Фрагмент</th></tr></thead><tbody>${l.map(x=>`<tr><td class="mono">${fmt(x.at)}</td><td>${esc(x.username)}</td><td class="mono">${esc(x.ip||'')}</td><td class="mono">${x.score==null?'—':Number(x.score).toFixed(3)}</td><td>${x.blocked?'<span class="badge banned">заблоковано</span>':'<span class="badge">лише запис</span>'}</td><td class="small">${esc(x.excerpt||'')}</td></tr>`).join('')}</tbody></table></div>`:'<div class="small">Інцидентів немає ✅</div>';
+  }catch(e){el.innerHTML=`<div class="state err">❌ ${esc(e.message)}</div>`}
+}
+async function aiMakeReport(){
+  const el=document.getElementById('aiReport');el.innerHTML='<div class="small">📝 Модель пише звіт…</div>';
+  try{const d=await callAdmin('ai-report');el.innerHTML=`<div class="security-item" style="margin-bottom:10px"><div class="top"><b>Звіт (${esc(d.model)})</b><span class="small">інцидентів за добу: ${d.facts.incidents}</span></div><div class="detail" style="white-space:pre-wrap">${esc(d.report)}</div></div>`;}catch(e){el.innerHTML=`<div class="state err">❌ ${esc(e.message)}</div>`}
+}
+async function aiClearIncidents(){if(!confirm('Очистити журнал інцидентів ІІ?'))return;try{await callAdmin('ai-incidents-clear',{confirm:'AI INCIDENTS'});aiLoadIncidents();}catch(e){alert('❌ '+e.message)}}
+function aiCollectConfig(){
+  const cfg={};
+  AI_BOOL_FIELDS.forEach(([k])=>cfg[k]=document.getElementById('aic-'+k).checked);
+  AI_NUM_FIELDS.forEach(([k])=>cfg[k]=Number(document.getElementById('aic-'+k).value));
+  cfg.model=document.getElementById('aic-model').value.trim();
+  cfg.fallbackModels=document.getElementById('aic-fallbackModels').value;
+  ['reportModel','guardModel','guardMode'].forEach(k=>cfg[k]=document.getElementById('aic-'+k).value.trim());
+  ['guardThreshold','guardAutoBlockStrikes'].forEach(k=>cfg[k]=Number(document.getElementById('aic-'+k).value));
+  cfg.reasoningEffort=document.getElementById('aic-reasoningEffort').value;
+  cfg.disabledMessage=document.getElementById('aic-disabledMessage').value;
+  return cfg;
+}
+async function aiSaveConfig(){
+  try{await callAdmin('ai-set-config',{config:aiCollectConfig(),confirm:'AI CONFIG'});alert('✅ Налаштування ІІ збережено (діють одразу).');renderAiAdmin();}catch(e){alert('❌ '+e.message)}
+}
+function aiFillDefaults(){
+  if(!aiAdminData)return;const dflt=aiAdminData.defaults;
+  AI_BOOL_FIELDS.forEach(([k])=>document.getElementById('aic-'+k).checked=!!dflt[k]);
+  AI_NUM_FIELDS.forEach(([k])=>document.getElementById('aic-'+k).value=dflt[k]);
+  document.getElementById('aic-model').value=dflt.model;document.getElementById('aic-fallbackModels').value=(dflt.fallbackModels||[]).join(', ');['reportModel','guardModel','guardMode','guardThreshold','guardAutoBlockStrikes'].forEach(k=>document.getElementById('aic-'+k).value=dflt[k]);document.getElementById('aic-reasoningEffort').value=dflt.reasoningEffort;document.getElementById('aic-disabledMessage').value=dflt.disabledMessage;
+}
+function aiEditUser(i){
+  const u=aiAdminData.users[i],a=u.access||{},e=u.effective;
+  const tri=(id,v)=>`<select id="${id}"><option value="" ${v==null?'selected':''}>За замовчуванням</option><option value="true" ${v===true?'selected':''}>Дозволити</option><option value="false" ${v===false?'selected':''}>Заборонити</option></select>`;
+  openModal(`<h2>🤖 Доступ до ІІ: ${esc(u.username)}</h2><div class="hint">Порожнє поле = значення за замовчуванням (глобальні: день ${aiAdminData.config.userDailyLimit}, вікно ${aiAdminData.config.userWindowLimit}/${aiAdminData.config.userWindowMinutes} хв, відповідь ${aiAdminData.config.maxTokens} ток.). Сьогодні використано: ${u.usage.count}.</div>
+  <div class="field"><label>ДОСТУП ДО ІІ</label>${tri('aiu-enabled',a.enabled)}</div>
+  <div class="field"><label>ІНТЕРНЕТ (ПОШУК)</label>${tri('aiu-web',a.webSearch)}</div>
+  <div class="field"><label>ФАЙЛИ В ЧАТІ</label>${tri('aiu-files',a.files)}</div>
+  <div class="field"><label>МОДЕЛЬ ДЛЯ ЦЬОГО КОРИСТУВАЧА (порожньо = основна: ${esc(aiAdminData.config.model)})</label><input id="aiu-model" list="aiModels" placeholder="${esc(aiAdminData.config.model)}" value="${esc(a.model||'')}"></div>
+  <div class="field"><label>ДЕННИЙ ЛІМІТ ПОВІДОМЛЕНЬ</label><input id="aiu-daily" type="number" min="0" placeholder="${aiAdminData.config.userDailyLimit}" value="${a.dailyLimit??''}"></div>
+  <div class="field"><label>ЛІМІТ У ВІКНІ (${aiAdminData.config.userWindowMinutes} хв)</label><input id="aiu-window" type="number" min="1" placeholder="${aiAdminData.config.userWindowLimit}" value="${a.windowLimit??''}"></div>
+  <div class="field"><label>МАКС. ДОВЖИНА ВІДПОВІДІ (ТОКЕНИ)</label><input id="aiu-tokens" type="number" min="200" placeholder="${aiAdminData.config.maxTokens}" value="${a.maxTokens??''}"></div>
+  <div class="field"><label>НОТАТКА АДМІНА (бачите лише ви)</label><input id="aiu-note" maxlength="200" value="${esc(a.note||'')}"></div>
+  <div class="actions"><button class="btn gray" onclick="closeModal()">Скасувати</button><button class="btn del" onclick="aiSaveUser(${i},true)">↩ Скинути до стандартних</button><button class="refresh" onclick="aiSaveUser(${i},false)">Зберегти</button></div>`);
+}
+async function aiSaveUser(i,reset){
+  const u=aiAdminData.users[i];
+  const v=id=>document.getElementById(id).value;
+  const access=reset?{}:{enabled:v('aiu-enabled')||null,webSearch:v('aiu-web')||null,files:v('aiu-files')||null,dailyLimit:v('aiu-daily')===''?null:Number(v('aiu-daily')),windowLimit:v('aiu-window')===''?null:Number(v('aiu-window')),maxTokens:v('aiu-tokens')===''?null:Number(v('aiu-tokens')),model:v('aiu-model').trim()||null,note:v('aiu-note')};
+  try{await callAdmin('ai-set-user',{username:u.username,access,confirm:`AI ${u.username}`});closeModal();renderAiAdmin();}catch(e){alert('❌ '+e.message)}
+}
+async function aiResetUsage(i){
+  const u=aiAdminData.users[i];if(!confirm(`Скинути сьогоднішній лічильник ІІ для ${u.username}?`))return;
+  try{await callAdmin('ai-reset-usage',{username:u.username,confirm:`AI ${u.username}`});renderAiAdmin();}catch(e){alert('❌ '+e.message)}
+}
+async function aiRefillQuotes(){
+  if(!confirm('Поповнити пул цитат зараз? Це 3 запити до Groq і кілька сторінок Вікіцитат.'))return;
+  try{const d=await callAdmin('ai-refill-quotes',{confirm:'AI QUOTES'});const r=d.result||{};alert(r.skipped?('ℹ️ Пропущено: '+r.skipped):(`✅ Додано цитат: ${r.added}. У пулі: ${r.pool}.\n`+(r.log||[]).join('\n')));renderAiAdmin();}catch(e){alert('❌ '+e.message)}
+}
+
 load();
 </script>
 </body>
